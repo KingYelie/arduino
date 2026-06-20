@@ -156,8 +156,12 @@ h1::after{content:'AYURIMA';position:absolute;left:0;top:0;color:#22d3ee;opacity
 
 <div id="over">
   <div class="over-title" id="overT"></div>
-  <div style="color:#6b5fa0;font-size:14px;margin-bottom:20px" id="overS"></div>
-  <button class="btn" onclick="location.reload()">REJOUER</button>
+  <div style="color:#6b5fa0;font-size:14px;margin-bottom:8px" id="overS"></div>
+  <div style="color:#4b3d78;font-size:11px;letter-spacing:1px;margin-bottom:24px;font-family:'Share Tech Mono',monospace" id="overStats"></div>
+  <div style="display:flex;gap:12px">
+    <button class="btn" onclick="location.reload()">REJOUER</button>
+    <button class="btn" onclick="returnToMenu()" style="background:linear-gradient(135deg,rgba(14,116,144,.9),rgba(29,78,216,.9))">MENU</button>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -425,7 +429,10 @@ resizeHUD();
 // Camera control
 const cam={x:0,z:0,zoom:22,rot:0};
 let keys={};
-window.addEventListener('keydown',e=>{keys[e.code]=true;});
+window.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Escape'&&G.running){G.sel=[];G.selBld=null;G.rallyMode=false;updateSelUI();updateBuildUI();}
+});
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 window.addEventListener('resize',()=>{
   renderer.setSize(innerWidth,innerHeight);
@@ -484,7 +491,7 @@ function getWorldPos(ex,ey){
   const nd=new THREE.Vector2((ex/innerWidth)*2-1,-(ey/innerHeight)*2+1);
   ray.setFromCamera(nd,camera);
   const t=new THREE.Vector3();
-  ray.ray.intersectPlane(gPlane,t);
+  if(!ray.ray.intersectPlane(gPlane,t))return null;
   return t;
 }
 
@@ -753,7 +760,7 @@ function spawnMines(){
   ];
   for(const[mx,mz]of positions){
     const geo=new THREE.OctahedronGeometry(0.75);
-    const mat=new THREE.MeshPhongMaterial({color:0xa78bfa,emissive:0x3b0fa0,shininess:80});
+    const mat=new THREE.MeshPhongMaterial({color:0xa78bfa,emissive:0x3b0fa0,shininess:80,transparent:true,opacity:1.0});
     const m=new THREE.Mesh(geo,mat);
     m.position.set(mx,0.75,mz);scene.add(m);
     G.mines.push({x:mx,z:mz,mesh:m,ess:rr(40,70)|0,regen:0.12,maxEss:70,timer:0});
@@ -941,6 +948,7 @@ function removeUnit(u){
   scene.remove(u.mesh);
   G.pop-=u.pop;
   if(G.pop<0)G.pop=0;
+  G.sel=G.sel.filter(id=>id!==u.id);
 }
 
 // ── AI SPAWN ───────────────────────────────────────────────────────────────
@@ -967,12 +975,12 @@ function spawnWave(){
     const ex=eb.x+rr(-5,5),ez=eb.z+rr(-5,5);
     setTimeout(()=>{if(!G.over)spawnUnit(ud.id,G.er,ex,ez,2);},i*300);
   }
-  if(G.wave%2===0){
+  if(G.wave<=2||G.wave%2===0){
     const bldgs=rd.bldgs;
     const toBuild=bldgs.filter(b=>{
       if(b.bldReq&&!G.pblds.some(pb=>pb.alive&&pb.team===2&&pb.typeId===b.bldReq))return false;
       const existing=G.pblds.filter(pb=>pb.alive&&pb.team===2&&pb.typeId===b.id).length;
-      return existing<1;
+      return existing<2;
     });
     if(toBuild.length){
       const bd=toBuild[0];
@@ -984,9 +992,9 @@ function spawnWave(){
       spawnPBld(bd.id,x,z,2);
     }
   }
-  // Wave completion toast
-  toast('Vague '+G.wave+' complétée!',2000);
-  G.waveT=0;G.waveInt=Math.max(22,G.waveInt-1.5);
+  G.waveT=0;G.waveInt=Math.max(20,G.waveInt-1.5);
+  // Scale enemy stats every 3 waves
+  if(G.wave%3===0){G.eb.bhm=Math.min(G.eb.bhm+0.1,1.8);G.eb.em=Math.min(G.eb.em+0.07,1.6);}
 }
 
 // ── DAMAGE & PROJECTILES ──────────────────────────────────────────────────
@@ -1018,6 +1026,7 @@ function dealDmg(attacker,target,amount){
     if(target.isPBld){
       target.alive=false;
       scene.remove(target.mesh);
+      if(target.rallyMesh)scene.remove(target.rallyMesh);
       const race=RACES[target.team===1?G.race:G.er];
       let refund=0;
       for(const q of target.queue){refund+=Math.floor(q.cost*0.5);}
@@ -1188,7 +1197,7 @@ function updateMines(dt){
   }
 }
 
-// ── ENEMY HARVESTER ───────────────────────────────────────────────────────
+// ── PASSIVE INCOME (ambient essence trickle) ──────────────────────────────
 let eHarvT=0;
 function updateEnemyEconomy(dt){
   eHarvT+=dt;
@@ -1196,10 +1205,12 @@ function updateEnemyEconomy(dt){
 }
 
 // ── MINIMAP ───────────────────────────────────────────────────────────────
-let mmCtx=null;
+let mmCtx=null,mmInited=false;
 function initMinimap(){
   const cv=document.getElementById('mmcv');
   mmCtx=cv.getContext('2d');
+  if(mmInited)return;
+  mmInited=true;
   cv.addEventListener('click',e=>{
     const r=cv.getBoundingClientRect();
     const px=(e.clientX-r.left)/130*MAP-MAP/2;
@@ -1252,13 +1263,13 @@ function startGame(){
 
   G.pblds=[];G.selBld=null;G.floats=[];G.uiT=0;
   G.ess=RACES[G.race].ess;
-  G.maxPop=RACES[G.race].pop+(G.tb.pop||0);
   G.pop=0;G.wave=0;G.waveT=0;G.waveInt=40;
-  G.running=true;G.over=false;
+  G.gameT=0;G.running=true;G.over=false;
   G.units=[];G.blds=[];G.projs=[];G.mines=[];G.sel=[];
   G.tech={};
   G.tb={bhm:1,ref:0,regen:0,de:0,em:1,asm:1,sdb:0,poison:false,novaUp:false,pop:0};
   G.eb={bhm:1,ref:0,regen:0,de:0,em:1,asm:1,sdb:0,poison:false,pop:0};
+  G.maxPop=RACES[G.race].pop;
 
   if(G.activeMission){
     G.wavesNeeded=G.activeMission.hard?6:4;
@@ -1327,7 +1338,8 @@ function buyTech(tid){
 function updateHUD(){
   document.getElementById('ess').textContent='✦ '+G.ess;
   document.getElementById('pop').textContent='⬡ '+G.pop+'/'+G.maxPop;
-  document.getElementById('wave').textContent='Vague '+(G.wave+1);
+  const wCd=Math.max(0,Math.ceil(G.waveInt-G.waveT));
+  document.getElementById('wave').textContent='Vague '+G.wave+' ⟶ '+wCd+'s';
   const s=Math.floor(G.gameT);
   const m=Math.floor(s/60).toString().padStart(2,'0');
   const sec=(s%60).toString().padStart(2,'0');
@@ -1570,7 +1582,7 @@ function onMouseUp(e){
     const wp=getWorldPos(e.clientX,e.clientY);
     if(!wp)return;
     for(const pb of G.pblds){
-      if(pb.alive&&pb.team===1&&dst2(pb.x,pb.z,wp.x,wp.z)<pb.def.sz+1){
+      if(pb.alive&&pb.team===1&&dst2(pb.x,pb.z,wp.x,wp.z)<pb.def.sz+3.5){
         G.selBld=pb.id;G.sel=[];SND.sel();
         updateBuildUI();updateSelUI();return;
       }
@@ -1713,7 +1725,25 @@ function endGame(won){
     subMsg='Votre base a été détruite...';
   }
   document.getElementById('overS').textContent=subMsg;
+  const race=G.race?RACES[G.race]:null;
+  document.getElementById('overStats').textContent=race?`FACTION: ${race.name.toUpperCase()} // VAGUE: ${G.wave} // TEMPS: ${Math.floor(G.gameT/60)}m${Math.floor(G.gameT%60).toString().padStart(2,'0')}s`:'';
   if(won)SND.win();else SND.lose();
+  hctx.clearRect(0,0,hcv.width,hcv.height);
+}
+
+function returnToMenu(){
+  document.getElementById('over').style.display='none';
+  document.getElementById('hud').style.display='none';
+  document.getElementById('panel').style.display='none';
+  document.getElementById('ifo').style.display='none';
+  document.getElementById('minimap').style.display='none';
+  document.getElementById('menu').style.display='flex';
+  hctx.clearRect(0,0,hcv.width,hcv.height);
+  G.over=false;
+  selRace=null;
+  document.getElementById('startBtn').disabled=true;
+  document.querySelectorAll('.rcard').forEach(c=>c.classList.remove('sel'));
+  try{setShowcaseHero('nexus');}catch(e){}
 }
 
 // ── SPINNER / BOBBER SYSTEM ───────────────────────────────────────────────
@@ -1777,6 +1807,7 @@ function loop(t){
   G.lastDt=dt;
   updateSpinners(dt);
   if(!G.running){
+    if(G.over){renderer.render(scene,camera);return;}
     updateShowcase(dt);
     renderer.render(showScene,showCam);
     return;
