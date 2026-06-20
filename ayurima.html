@@ -288,6 +288,26 @@ const MISSIONS=[
    obj:"Détruire le Grand Nexus Cristallin"}
 ];
 
+// ── HEROES (one legendary commander per race) ─────────────────────────────
+const HEROES={
+  nexus:{id:'h_nexus',name:'Aatranis',title:'Gardien du Nexus',col:0x818cf8,
+    cost:220,pop:6,hp:780,atk:78,rng:2.2,spd:3.2,rep:1.0,
+    aura:'shield',auraR:9,
+    desc:'Commandant équilibré. Lame de force et bouclier d\'énergie.'},
+  vide:{id:'h_vide',name:'Nexara',title:'Reine du Vide',col:0xf87171,
+    cost:200,pop:6,hp:680,atk:92,rng:1.8,spd:3.6,rep:0.9,
+    aura:'frenzy',auraR:9,
+    desc:'Prédateur apex. Frappe vorace, draine l\'essence ennemie.'},
+  cristal:{id:'h_cristal',name:'Crystara',title:'Ancienne des Cristalites',col:0x67e8f9,
+    cost:240,pop:6,hp:900,atk:70,rng:2.4,spd:2.6,rep:1.2,
+    aura:'heal',auraR:11,
+    desc:'Colosse cristallin. PV massifs et soin de zone.'},
+  synth:{id:'h_synth',name:'ARIA',title:'Conscience Synthétique',col:0xfbbf24,
+    cost:230,pop:6,hp:740,atk:84,rng:6.5,spd:2.8,rep:1.6,
+    aura:'overclock',auraR:10,
+    desc:'Titan d\'artillerie. Frappes longue portée dévastatrices.'}
+};
+
 // ── CAMPAIGN PERSISTENCE ──────────────────────────────────────────────────
 function getUnlocked(){
   try{return JSON.parse(localStorage.getItem('ayurima_unlocked')||'["m1"]');}
@@ -558,6 +578,64 @@ function mkUnitMesh(ud, raceId){
         armR.rotation.z=Math.PI/2;armR.position.set(-0.5,0,0);g.add(armR);
       }
     }
+  }
+  return g;
+}
+
+// ── HERO MESH FACTORY ────────────────────────────────────────────────────
+function mkHeroMesh(raceId){
+  const hd=HEROES[raceId];
+  const g=new THREE.Group();
+  const col=new THREE.Color(hd.col);
+  const eCol=col.clone().multiplyScalar(0.4);
+  const mat=(c,e,sh)=>new THREE.MeshPhongMaterial({color:c||col,emissive:e||eCol,shininess:sh||80});
+  const glass=(c,e,o)=>new THREE.MeshPhongMaterial({color:c,emissive:e,shininess:130,transparent:true,opacity:o||0.9});
+  const glow=(r,c)=>mesh(new THREE.IcosahedronGeometry(r,0),new THREE.MeshBasicMaterial({color:c}));
+  const aura=mesh(new THREE.RingGeometry(0.65,0.78,28),new THREE.MeshBasicMaterial({color:hd.col,transparent:true,opacity:0.55,side:THREE.DoubleSide}));
+  aura.rotation.x=-Math.PI/2;aura.position.y=0.04;addSpin(aura,0.6);g.add(aura);
+  const aura2=mesh(new THREE.RingGeometry(0.5,0.55,24),new THREE.MeshBasicMaterial({color:hd.col,transparent:true,opacity:0.35,side:THREE.DoubleSide}));
+  aura2.rotation.x=-Math.PI/2;aura2.position.y=0.05;addSpin(aura2,-0.9);g.add(aura2);
+  if(raceId==='nexus'){
+    const legL=mesh(new THREE.BoxGeometry(0.16,0.5,0.18),mat());legL.position.set(-0.16,0.25,0);g.add(legL);
+    const legR=legL.clone();legR.position.x=0.16;g.add(legR);
+    const torso=mesh(new THREE.BoxGeometry(0.5,0.62,0.34),mat());torso.position.y=0.8;g.add(torso);
+    const core=glow(0.13,0xc4b5fd);core.position.set(0,0.85,0.2);g.add(core);
+    for(const s of[-1,1]){const pad=mesh(new THREE.BoxGeometry(0.22,0.26,0.42),mat(0x6366f1,0x312e81));pad.position.set(s*0.42,1.0,0);g.add(pad);}
+    const head=mesh(new THREE.BoxGeometry(0.24,0.28,0.24),mat());head.position.y=1.32;g.add(head);
+    const visor=mesh(new THREE.BoxGeometry(0.26,0.07,0.05),new THREE.MeshBasicMaterial({color:0x93c5fd}));visor.position.set(0,1.34,0.13);g.add(visor);
+    const crest=mesh(new THREE.ConeGeometry(0.08,0.4,4),mat(0xc4b5fd,0x7c3aed));crest.position.y=1.62;g.add(crest);
+    const shield=mesh(new THREE.CylinderGeometry(0.34,0.34,0.08,6),mat(0x7c3aed,0x3b0fa0));shield.rotation.x=Math.PI/2;shield.position.set(-0.5,0.85,0.12);g.add(shield);
+    const sgem=glow(0.1,0xc4b5fd);sgem.position.set(-0.5,0.85,0.18);g.add(sgem);
+    const sword=mesh(new THREE.ConeGeometry(0.07,1.0,4),mat(0xe9d5ff,0xa78bfa));sword.position.set(0.5,1.0,0.1);g.add(sword);
+    const halo=mesh(new THREE.TorusGeometry(0.46,0.03,6,24),new THREE.MeshBasicMaterial({color:0x818cf8}));halo.position.y=1.7;halo.rotation.x=1.4;addSpin(halo,1.5);g.add(halo);
+    for(let i=0;i<2;i++){const piv=new THREE.Group();piv.position.y=0.9;piv.rotation.y=i*Math.PI;const orb=glow(0.06,0x93c5fd);orb.position.x=0.62;piv.add(orb);addSpin(piv,1.4+i*0.5);g.add(piv);}
+  } else if(raceId==='vide'){
+    addBob(g,0.07,1.6);
+    const body=mesh(new THREE.IcosahedronGeometry(0.46,1),mat());body.position.y=0.95;body.scale.set(0.85,1.25,0.85);g.add(body);
+    const eye=glow(0.18,0xfca5a5);eye.position.set(0,1.0,0.42);g.add(eye);
+    const crownN=6;for(let i=0;i<crownN;i++){const a=i/crownN*6.28;const sp=mesh(new THREE.ConeGeometry(0.07,0.55,4),mat(0x7f1d1d,0x450a0a));sp.position.set(Math.cos(a)*0.3,1.5,Math.sin(a)*0.3);sp.rotation.z=-Math.cos(a)*0.5;sp.rotation.x=Math.sin(a)*0.5;g.add(sp);}
+    for(let i=0;i<6;i++){const a=i/6*6.28;const leg=mesh(new THREE.ConeGeometry(0.05,0.95,4),mat(0x991b1b,0x450a0a));leg.position.set(Math.cos(a)*0.3,0.5,Math.sin(a)*0.3);leg.rotation.z=Math.cos(a)*1.0;leg.rotation.x=-Math.sin(a)*1.0;g.add(leg);}
+    for(let i=0;i<4;i++){const a=i/4*6.28;const sp=mesh(new THREE.ConeGeometry(0.08,0.6,4),mat(0x7f1d1d,0x450a0a));sp.position.set(Math.cos(a)*0.42,0.95,Math.sin(a)*0.42);sp.rotation.z=-Math.cos(a)*1.5;sp.rotation.x=Math.sin(a)*1.5;g.add(sp);}
+    const halo=mesh(new THREE.TorusGeometry(0.55,0.025,5,22),new THREE.MeshBasicMaterial({color:0xf97316}));halo.position.y=0.95;halo.rotation.x=1.3;addSpin(halo,2);g.add(halo);
+  } else if(raceId==='cristal'){
+    const base=mesh(new THREE.CylinderGeometry(0.3,0.5,0.3,6),mat());base.position.y=0.15;g.add(base);
+    const body=mesh(new THREE.CylinderGeometry(0.22,0.42,1.0,6),glass(col,eCol,0.88));body.position.y=0.78;g.add(body);
+    const core=glow(0.13,0xcffafe);core.position.y=0.85;addBob(core,0.05,2);g.add(core);
+    for(const s of[-1,1]){const sh=mesh(new THREE.ConeGeometry(0.14,0.8,5),glass(0x67e8f9,0x0e7490,0.82));sh.position.set(s*0.4,1.0,0);sh.rotation.z=-s*0.35;g.add(sh);}
+    const head=mesh(new THREE.OctahedronGeometry(0.26),glass(0xa5f3fc,0x0891b2,0.92));head.position.y=1.45;addSpin(head,0.6);g.add(head);
+    const crown=mesh(new THREE.ConeGeometry(0.12,0.5,6),glass(0xcffafe,0x0891b2,0.9));crown.position.y=1.85;g.add(crown);
+    for(let i=0;i<3;i++){const piv=new THREE.Group();piv.position.y=0.95;piv.rotation.y=i/3*6.28;const shard=glow(0.07,0x67e8f9);shard.position.x=0.6;piv.add(shard);addSpin(piv,0.9+i*0.3);g.add(piv);}
+    const halo=mesh(new THREE.TorusGeometry(0.5,0.025,5,24),new THREE.MeshBasicMaterial({color:0x22d3ee}));halo.position.y=1.0;halo.rotation.x=1.4;addSpin(halo,-1.2);g.add(halo);
+  } else {
+    const base=mesh(new THREE.CylinderGeometry(0.4,0.5,0.18,8),mat());base.position.y=0.12;g.add(base);
+    const hover=mesh(new THREE.TorusGeometry(0.5,0.04,6,20),new THREE.MeshBasicMaterial({color:0xfbbf24}));hover.rotation.x=Math.PI/2;hover.position.y=0.12;addSpin(hover,2.4);g.add(hover);
+    const torso=mesh(new THREE.BoxGeometry(0.56,0.6,0.4),mat());torso.position.y=0.7;g.add(torso);
+    const core=glow(0.12,0xfde68a);core.position.set(0,0.72,0.22);g.add(core);
+    const head=mesh(new THREE.BoxGeometry(0.3,0.2,0.24),mat(0xfbbf24,0xd97706));head.position.y=1.12;g.add(head);
+    const eye=mesh(new THREE.BoxGeometry(0.22,0.05,0.04),new THREE.MeshBasicMaterial({color:0xfde68a}));eye.position.set(0,1.13,0.13);g.add(eye);
+    for(const s of[-1,1]){const sh=mesh(new THREE.BoxGeometry(0.24,0.3,0.4),mat(0x92400e,0x78350f));sh.position.set(s*0.46,0.95,0);g.add(sh);const cannon=mesh(new THREE.CylinderGeometry(0.1,0.13,0.85,8),mat(0xfbbf24,0xd97706));cannon.rotation.x=Math.PI/2.2;cannon.position.set(s*0.46,1.0,0.25);g.add(cannon);}
+    const ant=mesh(new THREE.CylinderGeometry(0.02,0.02,0.5,4),mat(0xfbbf24,0xd97706));ant.position.y=1.45;g.add(ant);
+    const antTip=glow(0.05,0xfde68a);antTip.position.y=1.72;addBob(antTip,0.04,3);g.add(antTip);
   }
   return g;
 }
