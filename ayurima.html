@@ -2,14 +2,17 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>AYURIMA v5</title>
+<title>AYURIMA v6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;color:#c9b8ff;}
+body{background:#000;overflow:hidden;font-family:'Rajdhani','Segoe UI',sans-serif;color:#c9b8ff;}
 #c{display:block;width:100vw;height:100vh;}
 #ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;}
 #hud{position:fixed;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;pointer-events:none;}
-.hres{background:rgba(10,5,20,.82);border:1px solid #2d1f5e;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:700;}
+.hres{background:rgba(10,5,20,.82);border:1px solid #2d1f5e;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:700;font-family:'Share Tech Mono',monospace;}
 #ess{color:#a78bfa;}#pop{color:#34d399;}#wave{color:#f59e0b;}
 #panel{position:fixed;bottom:10px;left:10px;width:220px;max-height:75vh;overflow-y:auto;background:rgba(6,2,18,.92);border:1px solid #1a0f3a;border-radius:10px;padding:8px;pointer-events:all;scrollbar-width:thin;scrollbar-color:#2d1f5e #06020f;}
 #panel::-webkit-scrollbar{width:4px;}#panel::-webkit-scrollbar-track{background:#06020f;}#panel::-webkit-scrollbar-thumb{background:#2d1f5e;}
@@ -17,17 +20,45 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;color:#c9
 #log{position:fixed;top:44px;right:10px;width:190px;max-height:120px;overflow:hidden;pointer-events:none;}
 .logm{font-size:10px;background:rgba(0,0,0,.6);border-left:2px solid #7c3aed;padding:2px 6px;margin-bottom:2px;border-radius:0 4px 4px 0;opacity:1;transition:opacity 1s;}
 #menu,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0a0420 0%,#000 100%);z-index:100;}
-h1{font-size:48px;font-weight:900;letter-spacing:4px;background:linear-gradient(135deg,#7c3aed,#3b82f6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;}
-.sub{color:#6b5fa0;font-size:13px;letter-spacing:2px;margin-bottom:32px;}
-.race-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:24px;width:520px;}
-.rcard{background:#0d0820;border:2px solid #1a0f3a;border-radius:12px;padding:16px;cursor:pointer;transition:.18s;text-align:left;}
-.rcard:hover{border-color:#7c3aed;background:#120c2a;}
-.rcard.sel{border-color:#a78bfa;background:#160e30;}
-.rcard h3{font-size:15px;font-weight:700;margin-bottom:4px;}
-.rcard p{font-size:11px;color:#6b5fa0;line-height:1.5;}
-.btn{background:linear-gradient(135deg,#4f1d96,#1d4ed8);border:none;color:#e0d8ff;padding:12px 36px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:.15s;}
-.btn:hover{filter:brightness(1.2);}
-.btn:disabled{opacity:.4;cursor:not-allowed;}
+/* ── HOLOGRAPHIC MENU ───────────────────────────────────────── */
+#menu{background:transparent;}
+.holo-overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 50% 38%,rgba(20,8,48,.25) 0%,rgba(2,1,10,.78) 70%,rgba(0,0,0,.94) 100%);}
+.scanlines{position:fixed;inset:0;z-index:90;pointer-events:none;opacity:.5;background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0px,rgba(0,0,0,0) 2px,rgba(124,58,237,.045) 3px,rgba(0,0,0,0) 4px);mix-blend-mode:screen;}
+.vignette{position:fixed;inset:0;z-index:91;pointer-events:none;box-shadow:inset 0 0 220px 40px rgba(0,0,0,.85);}
+.corner{position:fixed;width:46px;height:46px;z-index:92;pointer-events:none;border:1.5px solid rgba(124,58,237,.55);}
+.corner.tl{top:22px;left:22px;border-right:none;border-bottom:none;}
+.corner.tr{top:22px;right:22px;border-left:none;border-bottom:none;}
+.corner.bl{bottom:22px;left:22px;border-right:none;border-top:none;}
+.corner.br{bottom:22px;right:22px;border-left:none;border-top:none;}
+#menu .topbar{position:fixed;top:30px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;color:#5b4a8f;z-index:101;}
+#menu .topbar .dot{width:6px;height:6px;border-radius:50%;background:#22d3ee;box-shadow:0 0 8px #22d3ee;animation:pulse 1.6s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.holo-line{width:160px;height:1px;background:linear-gradient(90deg,transparent,rgba(124,58,237,.6),transparent);}
+h1{font-family:'Orbitron',sans-serif;font-size:74px;font-weight:900;letter-spacing:14px;color:#e9d5ff;text-shadow:0 0 18px rgba(124,58,237,.65),0 0 42px rgba(59,130,246,.4);margin-bottom:4px;position:relative;}
+h1::after{content:'AYURIMA';position:absolute;left:0;top:0;color:#22d3ee;opacity:.32;transform:translate(3px,0);mix-blend-mode:screen;clip-path:inset(45% 0 35% 0);animation:glitch 4.5s infinite;}
+@keyframes glitch{0%,92%,100%{transform:translate(3px,0);opacity:.3}93%{transform:translate(-4px,2px);opacity:.6}96%{transform:translate(5px,-2px);opacity:.5}}
+.sub{font-family:'Share Tech Mono',monospace;color:#6b5fa0;font-size:12px;letter-spacing:7px;margin-bottom:34px;text-transform:uppercase;}
+.sub .acc{color:#22d3ee;}
+.race-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:30px;width:760px;}
+.rcard{position:relative;background:linear-gradient(160deg,rgba(13,8,32,.72),rgba(6,3,18,.72));border:1px solid #241848;border-radius:4px;padding:0 0 14px;cursor:pointer;transition:.2s;text-align:left;overflow:hidden;backdrop-filter:blur(3px);}
+.rcard::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--rc,#7c3aed),transparent);opacity:.7;}
+.rcard:hover{border-color:var(--rc,#7c3aed);transform:translateY(-4px);box-shadow:0 12px 40px -12px var(--rc,#7c3aed);}
+.rcard.sel{border-color:var(--rc,#a78bfa);box-shadow:0 0 0 1px var(--rc,#a78bfa),0 14px 50px -14px var(--rc,#a78bfa);}
+.rcard .preview{width:100%;height:120px;display:block;background:radial-gradient(ellipse at 50% 70%,rgba(124,58,237,.10),transparent 70%);}
+.rcard .rbody{padding:0 14px;}
+.rcard .rtag{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:2px;color:#4b3d78;margin-bottom:5px;}
+.rcard h3{font-family:'Orbitron',sans-serif;font-size:17px;font-weight:700;margin-bottom:6px;letter-spacing:1px;}
+.rcard p{font-size:12.5px;color:#8678ad;line-height:1.45;font-weight:500;}
+.rcard .stats{display:flex;gap:12px;margin-top:9px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#4b3d78;}
+.rcard .stats b{color:#7c6bb0;font-weight:400;}
+.rcard.sel .selmark{opacity:1;}
+.rcard .selmark{position:absolute;top:8px;right:9px;font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1px;color:var(--rc,#a78bfa);opacity:0;transition:.2s;}
+.btn{font-family:'Orbitron',sans-serif;background:linear-gradient(135deg,rgba(79,29,150,.9),rgba(29,78,216,.9));border:1px solid rgba(167,139,250,.5);color:#e9d5ff;padding:14px 44px;border-radius:3px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:3px;transition:.18s;position:relative;overflow:hidden;}
+.btn::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);transform:translateX(-100%);transition:.5s;}
+.btn:hover::before{transform:translateX(100%);}
+.btn:hover{filter:brightness(1.25);box-shadow:0 0 26px -6px rgba(124,58,237,.8);}
+.btn:disabled{opacity:.35;cursor:not-allowed;filter:none;}
+.btn:disabled::before{display:none;}
 .pbtn{background:#0d0a1a;border:1px solid #1f1545;border-radius:8px;padding:6px 5px;cursor:pointer;text-align:left;transition:.12s;width:100%;margin-bottom:3px;display:block;}
 .pbtn:hover:not(.dis):not(.lk){border-color:#7c3aed;background:#140e2a;}
 .pbtn.dis{opacity:.4;cursor:not-allowed;}
@@ -90,12 +121,19 @@ h1{font-size:48px;font-weight:900;letter-spacing:4px;background:linear-gradient(
 </div>
 
 <div id="menu">
-  <h1>AYURIMA</h1>
-  <div class="sub">STRATÉGIE TACTIQUE v5</div>
-  <div class="race-grid" id="rcards"></div>
-  <div style="display:flex;gap:10px;flex-direction:column;align-items:center">
-    <button class="btn" id="startBtn" disabled>PARTIE RAPIDE</button>
-    <button class="btn" onclick="showCampaign()" style="background:linear-gradient(135deg,#0e7490,#1d4ed8)">CAMPAGNE</button>
+  <div class="holo-overlay"></div>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+  <div class="topbar"><span>SYS.AYURIMA</span><div class="holo-line"></div><span class="dot"></span><span>LINK ESTABLISHED</span><div class="holo-line"></div><span>v6.0</span></div>
+  <div style="position:relative;z-index:5;display:flex;flex-direction:column;align-items:center">
+    <h1>AYURIMA</h1>
+    <div class="sub">PROTOCOLE&nbsp;TACTIQUE&nbsp;<span class="acc">// SÉLECTION&nbsp;DE&nbsp;FACTION</span></div>
+    <div class="race-grid" id="rcards"></div>
+    <div style="display:flex;gap:14px;align-items:center">
+      <button class="btn" id="startBtn" disabled>PARTIE RAPIDE</button>
+      <button class="btn" onclick="showCampaign()" style="background:linear-gradient(135deg,rgba(14,116,144,.9),rgba(29,78,216,.9))">CAMPAGNE</button>
+    </div>
   </div>
 </div>
 
@@ -1374,6 +1412,7 @@ let dragStart=null,dragging=false;
 const selBox={el:null};
 
 function onMouseDown(e){
+  if(e.target.closest('#panel,#minimap'))return;
   if(e.button===2){
     e.preventDefault();
     const wp=getWorldPos(e.clientX,e.clientY);
@@ -1432,6 +1471,7 @@ function onMouseMove(e){
 }
 
 function onMouseUp(e){
+  if(e.target.closest('#panel,#minimap'))return;
   if(e.button===0){
     if(selBox.el){document.body.removeChild(selBox.el);selBox.el=null;}
     if(dragging&&dragStart){
@@ -1598,14 +1638,59 @@ function endGame(won){
   if(won)SND.win();else SND.lose();
 }
 
+// ── MENU SHOWCASE SCENE (3D background) ─────────────────────────────────────
+const showScene=new THREE.Scene();
+showScene.background=new THREE.Color(0x05030f);
+showScene.fog=new THREE.Fog(0x05030f,14,42);
+const showCam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,200);
+showCam.position.set(0,2.4,9);showCam.lookAt(0,1.6,0);
+showScene.add(new THREE.AmbientLight(0x241850,1.0));
+const sKey=new THREE.DirectionalLight(0xa9b4ff,1.1);sKey.position.set(6,10,8);showScene.add(sKey);
+const sRim=new THREE.PointLight(0x7c3aed,2.2,40);sRim.position.set(-6,4,-4);showScene.add(sRim);
+const sFill=new THREE.PointLight(0x22d3ee,1.3,40);sFill.position.set(6,2,4);showScene.add(sFill);
+const showPlat=new THREE.Group();showScene.add(showPlat);
+const sDisc=new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.9,0.18,40),new THREE.MeshPhongMaterial({color:0x0c0826,emissive:0x14082e,shininess:40}));
+sDisc.position.y=-0.05;showPlat.add(sDisc);
+const sRing1=new THREE.Mesh(new THREE.TorusGeometry(3.1,0.02,6,60),new THREE.MeshBasicMaterial({color:0x7c3aed}));sRing1.rotation.x=Math.PI/2;sRing1.position.y=0.06;showPlat.add(sRing1);addSpin(sRing1,0.25);
+const sRing2=new THREE.Mesh(new THREE.TorusGeometry(3.5,0.012,6,60),new THREE.MeshBasicMaterial({color:0x22d3ee}));sRing2.rotation.x=Math.PI/2;sRing2.position.y=0.04;showPlat.add(sRing2);addSpin(sRing2,-0.18);
+const pcnt=240,parr=new Float32Array(pcnt*3);
+for(let i=0;i<pcnt;i++){const r=4+Math.random()*16,a=Math.random()*6.28,y=Math.random()*16-2;parr[i*3]=Math.cos(a)*r;parr[i*3+1]=y;parr[i*3+2]=Math.sin(a)*r;}
+const pgeo=new THREE.BufferGeometry();pgeo.setAttribute('position',new THREE.BufferAttribute(parr,3));
+const showParts=new THREE.Points(pgeo,new THREE.PointsMaterial({color:0x9d7bff,size:0.07,transparent:true,opacity:0.7}));
+showScene.add(showParts);
+const showHolder=new THREE.Group();showHolder.position.y=0.06;showScene.add(showHolder);
+let showHero=null,showRace='nexus';
+function setShowcaseHero(raceId){
+  if(raceId===showRace&&showHero)return;
+  showRace=raceId;
+  if(showHero){showHolder.remove(showHero);}
+  showHero=mkHeroMesh(raceId);
+  showHero.scale.setScalar(1.7);
+  showHolder.add(showHero);
+  const hd=HEROES[raceId];
+  sRim.color.set(hd.col);
+}
+setShowcaseHero('nexus');
+function updateShowcase(dt){
+  showHolder.rotation.y+=dt*0.45;
+  showParts.rotation.y-=dt*0.04;
+  const t=performance.now()/1000;
+  showParts.position.y=Math.sin(t*0.3)*0.4;
+}
+
 // ── MAIN LOOP ──────────────────────────────────────────────────────────────
 let lastT=0;
 function loop(t){
   requestAnimationFrame(loop);
   const dt=Math.min((t-lastT)/1000,0.05);lastT=t;
   G.lastDt=dt;
+  updateSpinners(dt);
+  if(!G.running){
+    updateShowcase(dt);
+    renderer.render(showScene,showCam);
+    return;
+  }
   renderer.render(scene,camera);
-  if(!G.running){return;}
   G.gameT+=dt;
   updateCam(dt);
   updateMines(dt);
@@ -1626,21 +1711,64 @@ requestAnimationFrame(loop);
 const raceKeys=Object.keys(RACES);
 const rcards=document.getElementById('rcards');
 let selRace=null;
-for(const rk of raceKeys){
+const RACE_TAG={nexus:'FACTION // 01',vide:'FACTION // 02',cristal:'FACTION // 03',synth:'FACTION // 04'};
+
+raceKeys.forEach((rk)=>{
   const rd=RACES[rk];
+  const hd=HEROES[rk];
   const d=document.createElement('div');
   d.className='rcard';
-  d.innerHTML=`<h3 style="color:${rd.color}">${rd.name}</h3><p>${rd.desc}<br><span style="color:#3d2f6e">Pop: ${rd.pop} | Ess: ${rd.ess}</span></p>`;
+  d.style.setProperty('--rc',rd.color);
+  d.innerHTML=`
+    <div class="preview" id="prev-${rk}"></div>
+    <div class="selmark">● ENGAGÉ</div>
+    <div class="rbody">
+      <div class="rtag">${RACE_TAG[rk]}</div>
+      <h3 style="color:${rd.color}">${rd.name}</h3>
+      <p>${rd.desc}</p>
+      <div class="stats"><span>POP <b>${rd.pop}</b></span><span>ESS <b>${rd.ess}</b></span><span>UNITÉS <b>${rd.units.length}</b></span></div>
+      <div class="stats" style="margin-top:4px"><span style="color:${rd.color}">⚜ HÉROS</span> <b style="color:#b8a9e0">${hd.name}</b></div>
+    </div>`;
   d.onclick=()=>{
     document.querySelectorAll('.rcard').forEach(c=>c.classList.remove('sel'));
     d.classList.add('sel');selRace=rk;
     const others=raceKeys.filter(r=>r!==rk);
     G.er=others[Math.floor(Math.random()*others.length)];
     G.race=rk;
+    setShowcaseHero(rk);
     document.getElementById('startBtn').disabled=false;
   };
   rcards.appendChild(d);
+});
+
+// Static 3D hero previews rendered with the main renderer
+function generateRacePreviews(){
+  const W=356,H=240;
+  SPIN_OFF=true;
+  const pScene=new THREE.Scene();
+  const pCam=new THREE.PerspectiveCamera(40,W/H,0.1,100);pCam.position.set(2.0,2.3,6.2);pCam.lookAt(0,1.3,0);
+  pScene.add(new THREE.AmbientLight(0x2a1a55,1.2));
+  const k=new THREE.DirectionalLight(0xc6cdff,1.25);k.position.set(3,6,5);pScene.add(k);
+  const rim=new THREE.PointLight(0xffffff,2.6,24);rim.position.set(-3.5,2.5,-2);pScene.add(rim);
+  const fill=new THREE.PointLight(0x22d3ee,0.8,24);fill.position.set(3,1,3);pScene.add(fill);
+  const holder=new THREE.Group();pScene.add(holder);
+  renderer.setClearColor(0x07041a,1);
+  renderer.setSize(W,H,false);
+  for(const rk of raceKeys){
+    while(holder.children.length)holder.remove(holder.children[0]);
+    const hero=mkHeroMesh(rk);hero.scale.setScalar(1.5);hero.rotation.y=-0.55;holder.add(hero);
+    const pdisc=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.5,0.12,28),new THREE.MeshPhongMaterial({color:0x0c0826,emissive:new THREE.Color(RACES[rk].color).getHex(),emissiveIntensity:0.15,shininess:40}));holder.add(pdisc);
+    rim.color.set(new THREE.Color(RACES[rk].color).getHex());
+    renderer.render(pScene,pCam);
+    try{const url=renderer.domElement.toDataURL('image/png');const el=document.getElementById('prev-'+rk);if(el){el.style.backgroundImage='url('+url+')';el.style.backgroundSize='cover';el.style.backgroundPosition='center';}}catch(e){}
+  }
+  renderer.setClearColor(0x000000,0);
+  renderer.setSize(innerWidth,innerHeight,false);
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  SPIN_OFF=false;
 }
+generateRacePreviews();
+
 document.getElementById('startBtn').onclick=()=>{
   if(selRace){
     G.activeMission=null;
