@@ -1490,7 +1490,7 @@ let dragStart=null,dragging=false;
 const selBox={el:null};
 
 function onMouseDown(e){
-  if(e.target.closest('#panel,#minimap'))return;
+  if(e.target.closest('#panel,#minimap,#menu'))return;
   if(e.button===2){
     e.preventDefault();
     const wp=getWorldPos(e.clientX,e.clientY);
@@ -1549,7 +1549,7 @@ function onMouseMove(e){
 }
 
 function onMouseUp(e){
-  if(e.target.closest('#panel,#minimap'))return;
+  if(e.target.closest('#panel,#minimap,#menu'))return;
   if(e.button===0){
     if(selBox.el){document.body.removeChild(selBox.el);selBox.el=null;}
     if(dragging&&dragStart){
@@ -1716,6 +1716,19 @@ function endGame(won){
   if(won)SND.win();else SND.lose();
 }
 
+// ── SPINNER / BOBBER SYSTEM ───────────────────────────────────────────────
+let SPIN_OFF=false;
+const SPINNERS=[];
+function addSpin(obj,spd){if(!SPIN_OFF)SPINNERS.push({obj,spd,type:'spin'});}
+function addBob(obj,amp,freq){if(!SPIN_OFF)SPINNERS.push({obj,amp,freq,type:'bob',base:obj.position.y});}
+function updateSpinners(dt){
+  const t=performance.now()/1000;
+  for(const s of SPINNERS){
+    if(s.type==='spin')s.obj.rotation.y+=s.spd*dt;
+    else s.obj.position.y=s.base+Math.sin(t*s.freq)*s.amp;
+  }
+}
+
 // ── MENU SHOWCASE SCENE (3D background) ─────────────────────────────────────
 const showScene=new THREE.Scene();
 showScene.background=new THREE.Color(0x05030f);
@@ -1813,7 +1826,7 @@ raceKeys.forEach((rk)=>{
     const others=raceKeys.filter(r=>r!==rk);
     G.er=others[Math.floor(Math.random()*others.length)];
     G.race=rk;
-    setShowcaseHero(rk);
+    try{setShowcaseHero(rk);}catch(e){}
     document.getElementById('startBtn').disabled=false;
   };
   rcards.appendChild(d);
