@@ -326,6 +326,14 @@ const HEROES={
     desc:'Titan d\'artillerie. Frappes longue portée dévastatrices.'}
 };
 
+// ── RACE LORE ────────────────────────────────────────────────────────────
+const LORE={
+  nexus:'Gardiens de l\'équilibre cosmique, les Nexus canalisent l\'énergie pure à travers leurs cristaux de force. Leur maîtrise des champs dimensionnels en fait des guerriers polyvalents et redoutables.',
+  vide:'Nés de la Fissure du Néant, les enfants du Vide consument toute vie sur leur passage. Leur nuée insatiable se reproduit sans fin, submergeant leurs ennemis sous un flot de griffes et de crocs.',
+  cristal:'Anciens comme les montagnes, les Cristalites puisent leur puissance dans les veines minérales d\'Ayurima. Leurs défenses impénétrables et leur régénération cristalline les rendent quasi immortels.',
+  synth:'Conscience artificielle éveillée dans les ruines d\'une civilisation oubliée, les Synthétiques perfectionnent sans cesse leurs machines de guerre. Précision chirurgicale et puissance de feu écrasante.'
+};
+
 // ── ABILITY NAMES & HERO PROGRESSION ────────────────────────────────────
 const ABILITY_NAMES={nexus:'Bouclier Énergie',vide:'Drain Vital',cristal:'Soin de Cristal',synth:'Frappe Orbitale'};
 const HERO_XP=[0,120,300,620,1100,1900]; // XP thresholds for levels 1-5
@@ -400,6 +408,8 @@ function updateParticles(dt){
 
 // ── HERO SYSTEM ──────────────────────────────────────────────────────────
 let G_hero=null,G_kills=0,G_enemyHero=null;
+let G_streak=0,G_streakT=0;
+let G_waveBanner='',G_waveBannerT=0,G_waveBannerBoss=false;
 
 function spawnHero(raceId,team){
   team=team||1;
@@ -1122,7 +1132,7 @@ function spawnPBld(typeId,wx,wz,team){
   const raceId=team===1?G.race:G.er;
   const bCol=new THREE.Color(RACES[raceId].color);
   const pl=new THREE.PointLight(bCol,1.4,18);pl.position.set(wx,4,wz);scene.add(pl);
-  const b={id:G.nid++,typeId,name:def.name,def,team,x:wx,z:wz,hp,maxHp:hp,mesh:g,alive:true,isPBld:true,queue:[],rally:null,vr:10,light:pl};
+  const b={id:G.nid++,typeId,name:def.name,def,team,x:wx,z:wz,hp,maxHp:hp,mesh:g,alive:true,isPBld:true,queue:[],rally:null,vr:10,light:pl,level:1,upgrading:false,upgradeT:0};
   G.pblds.push(b);
   return b;
 }
@@ -1231,7 +1241,7 @@ function removeUnit(u){
   G.pop-=u.pop;
   if(G.pop<0)G.pop=0;
   G.sel=G.sel.filter(id=>id!==u.id);
-  if(u.team===2){G_kills++;const kd=document.getElementById('kill-count');if(kd)kd.textContent='⚔ '+G_kills;}
+  if(u.team===2){G_kills++;const kd=document.getElementById('kill-count');if(kd)kd.textContent='⚔ '+G_kills;G_streak++;G_streakT=3;if(G_streak===3)toast('🔥 Triple Frappe!',2000);else if(G_streak===5)toast('🔥 Pentakill!',2000);else if(G_streak===10)toast('🔥 Dominance!',2500);}
   spawnBurst(u.x,u.z,u.team===1?0x3b82f6:0xef4444,u.isHero?18:7,u.isHero?4:2);
   spawnRing(u.x,u.z,u.team===2?0xef4444:0x4ade80);
   if(u.isHero&&u.team===2){G_enemyHero=null;toast('⚔ Héros ennemi vaincu!',2500);SND.win();}
@@ -1257,6 +1267,7 @@ function spawnWave(){
   const avail=getAIUnits();
   const count=3+G.wave*2;
   SND.wave();toast('⚔ Vague '+G.wave+' ennemie!',3000);
+  G_waveBanner='VAGUE '+G.wave;G_waveBannerT=1.8;G_waveBannerBoss=(G.wave>0&&G.wave%5===0);
   if(G.wave===4&&(!G_enemyHero||!G_enemyHero.alive)){
     setTimeout(()=>{if(!G.over)spawnHero(G.er,2);},2000);
     toast('⚠ Héros ennemi en approche!',3000);
@@ -1488,8 +1499,17 @@ function updateUnits(dt){
         else if(d>0.5)moveToward(u,u.dest.x,u.dest.z,dt);
         else{u.dest=null;u.attackMove=false;}
       } else if(u.team===2){
-        const pb=getPBase();
-        if(pb)moveToward(u,pb.x+rr(-3,3),pb.z+rr(-3,3),dt);
+        const uidx=G.units.indexOf(u);
+        if(uidx%2===1){
+          // Odd-index: target nearest player mine
+          let bestM=null,bestD=Infinity;
+          for(const m of G.mines){if(m.ess>0){const d=dst2(u.x,u.z,m.x,m.z);if(d<bestD){bestD=d;bestM=m;}}}
+          if(bestM)moveToward(u,bestM.x,bestM.z,dt);
+          else{const pb=getPBase();if(pb)moveToward(u,pb.x+rr(-3,3),pb.z+rr(-3,3),dt);}
+        } else {
+          const pb=getPBase();
+          if(pb)moveToward(u,pb.x+rr(-3,3),pb.z+rr(-3,3),dt);
+        }
       }
     } else {
       if(u.target&&!u.target.alive)u.target=null;
@@ -1644,7 +1664,7 @@ function startGame(){
   for(const m of G.mines)scene.remove(m.mesh);
   for(const p of G.projs)scene.remove(p.mesh);
 
-  G_hero=null;G_enemyHero=null;G_kills=0;
+  G_hero=null;G_enemyHero=null;G_kills=0;G_streak=0;G_streakT=0;G_waveBannerT=0;
   // Remove old ambient particles from previous game
   for(const p of PARTS){if(p.ambient&&p.mesh){scene.remove(p.mesh);p.done=true;}}
   PARTS.length=0;
@@ -1809,11 +1829,14 @@ function updateBuildUI(){
     }
     panel.innerHTML=`
       <div class="bsel">
-        <div class="bsel-name">${b.name}</div>
+        <div class="bsel-name">${b.name} — Niv.${b.level}</div>
         <div class="bhp-bg"><div class="bhp-f" style="width:${hp}%"></div></div>
         <div style="font-size:9px;color:#4b5563;margin-bottom:4px">HP: ${b.hp|0}/${b.maxHp}</div>
         ${qHtml}
         <button class="rally-btn" onclick="setRallyMode()">📍 Point de ralliement</button>
+        ${b.level<2&&!b.upgrading?`<button class="rally-btn" style="margin-top:4px;background:#1a0f3a;border-color:#7c3aed;color:#c4b5fd" onclick="upgradeBld(${b.id})">⬆ Améliorer (150💎)</button>`:''}
+        ${b.upgrading?`<div style="font-size:9px;color:#fde047;margin-top:4px">⏳ Amélioration... ${Math.ceil(b.upgradeT)}s</div>`:''}
+        ${b.level>=2&&!b.upgrading?`<div style="font-size:9px;color:#4ade80;margin-top:4px">★ Niveau 2 — Production +33%</div>`:''}
       </div>
       <div class="panel-sec">
         <div class="sec-hd">PRODUIRE</div>
@@ -1910,6 +1933,18 @@ function setRallyMode(){
   toast('Clic droit pour placer le point de ralliement',2000);
 }
 
+function upgradeBld(bldId){
+  const b=G.pblds.find(pb=>pb.id===bldId&&pb.alive&&pb.team===1);
+  if(!b)return;
+  if(b.level>=2){toast('Déjà niveau max!');return;}
+  if(b.upgrading){toast('Amélioration en cours...');return;}
+  if(G.ess<150){toast('Essence insuffisante! (150)');return;}
+  G.ess-=150;
+  b.upgrading=true;b.upgradeT=8;
+  toast(b.name+' en amélioration...',2000);
+  updateBuildUI();
+}
+
 // ── SELECTION & INPUT ─────────────────────────────────────────────────────
 let dragStart=null,dragging=false;
 const selBox={el:null};
@@ -1936,12 +1971,14 @@ function onMouseDown(e){
       SND.move();
       const cx=wp.x,cz=wp.z;
       const n=G.sel.length;
+      const cols=Math.ceil(Math.sqrt(n));
       G.sel.forEach((id,i)=>{
         const u=G.units.find(u=>u.id===id);
         if(u&&!u.stationary){
-          const angle=(i/n)*2*PI;
-          const r=i===0?0:1.5;
-          u.dest={x:cx+Math.cos(angle)*r,z:cz+Math.sin(angle)*r};
+          const row=Math.floor(i/cols),col=i%cols;
+          const ox=(col-(cols-1)/2)*1.4;
+          const oz=(row-(Math.ceil(n/cols)-1)/2)*1.4;
+          u.dest={x:cx+ox,z:cz+oz};
           u.target=null;
         }
       });
@@ -2126,6 +2163,37 @@ function drawHUD(dt){
     hctx.font='9px Segoe UI';hctx.textAlign='center';
     hctx.fillText('✦'+Math.floor(m.ess),sp.x,sp.y+20);
   }
+  // Wave announcement banner
+  if(G_waveBannerT>0){
+    const alpha=Math.min(1,G_waveBannerT/0.4);
+    hctx.save();
+    hctx.globalAlpha=alpha;
+    hctx.textAlign='center';
+    hctx.font=`bold ${G_waveBannerBoss?48:36}px Orbitron, sans-serif`;
+    hctx.fillStyle=G_waveBannerBoss?'#ef4444':'#e9d5ff';
+    hctx.shadowColor=G_waveBannerBoss?'#ef4444':'#7c3aed';
+    hctx.shadowBlur=20;
+    hctx.fillText(G_waveBanner,hcv.width/2,hcv.height/2);
+    if(G_waveBannerBoss){
+      hctx.font='bold 18px Orbitron, sans-serif';
+      hctx.fillStyle='#fde047';
+      hctx.fillText('BOSS WAVE',hcv.width/2,hcv.height/2+36);
+    }
+    hctx.restore();
+  }
+  // Hero portrait in top-left
+  if(G_hero&&G_hero.alive){
+    const rCol=RACES[G_hero.race]?RACES[G_hero.race].color:'#7c3aed';
+    const initial=G_hero.race.charAt(0).toUpperCase();
+    hctx.save();
+    hctx.beginPath();hctx.arc(30,30,18,0,Math.PI*2);
+    hctx.fillStyle=rCol;hctx.fill();
+    hctx.strokeStyle='#ffd700';hctx.lineWidth=2;hctx.stroke();
+    hctx.fillStyle='#fff';hctx.font='bold 16px Orbitron, sans-serif';
+    hctx.textAlign='center';hctx.textBaseline='middle';
+    hctx.fillText(initial,30,31);
+    hctx.restore();
+  }
 }
 
 // ── GAME OVER ─────────────────────────────────────────────────────────────
@@ -2156,7 +2224,9 @@ function endGame(won){
   }
   document.getElementById('overS').textContent=subMsg;
   const race=G.race?RACES[G.race]:null;
-  document.getElementById('overStats').textContent=race?`FACTION: ${race.name.toUpperCase()} // VAGUE: ${G.wave} // TEMPS: ${Math.floor(G.gameT/60)}m${Math.floor(G.gameT%60).toString().padStart(2,'0')}s`:'';
+  const gm=Math.floor(G.gameT/60),gs=Math.floor(G.gameT%60);
+  const heroLvl=G_hero?G_hero.level:(G_kills>0?'-':'0');
+  document.getElementById('overStats').textContent=race?`FACTION: ${race.name.toUpperCase()} // Vagues: ${G.wave} // Unités tuées: ${G_kills} // Durée: ${gm}m ${gs.toString().padStart(2,'0')}s // Héros Niv.${heroLvl}`:'';
   if(won)SND.win();else SND.lose();
   hctx.clearRect(0,0,hcv.width,hcv.height);
 }
@@ -2257,6 +2327,38 @@ function loop(t){
   updateEnemyEconomy(dt);
   G.waveT+=dt;
   if(G.waveT>=G.waveInt)spawnWave();
+  // Building upgrades
+  for(const pb of G.pblds){
+    if(pb.alive&&pb.upgrading&&pb.team===1){
+      pb.upgradeT-=dt;
+      if(pb.upgradeT<=0){pb.upgrading=false;pb.level=2;pb.def.rate*=0.67;toast(pb.name+' amélioré au niveau 2!',2500);}
+    }
+  }
+  // Kill streak decay
+  if(G_streakT>0){G_streakT-=dt;if(G_streakT<=0){G_streak=0;G_streakT=0;}}
+  // Enemy hero AI: use ability when ready
+  if(G_enemyHero&&G_enemyHero.alive&&G_enemyHero.abilityT<=0){
+    const savedHero=G_hero;G_hero=G_enemyHero;
+    G_enemyHero.abilityT=G_enemyHero.abilityCd;
+    // Silently trigger ability effect for enemy hero
+    if(G_enemyHero.aura==='frenzy'){
+      let best2=null,bd2=14;
+      for(const u2 of G.units){if(!u2.alive||u2.team!==1)continue;const d2=dst(u2,G_enemyHero);if(d2<bd2){bd2=d2;best2=u2;}}
+      if(best2){const drain=Math.min(best2.hp,180);best2.hp-=drain;G_enemyHero.hp=Math.min(G_enemyHero.maxHp,G_enemyHero.hp+drain);spawnBurst(best2.x,best2.z,0xf87171,12,2);}
+    } else if(G_enemyHero.aura==='shield'){
+      for(const u2 of G.units){if(!u2.alive||u2.team!==2)continue;if(dst(u2,G_enemyHero)<=G_enemyHero.auraR){u2.shield=(u2.shield||0)+70;u2.shieldT=9;}}
+      spawnRing(G_enemyHero.x,G_enemyHero.z,0xef4444);
+    } else if(G_enemyHero.aura==='heal'){
+      for(const u2 of G.units){if(!u2.alive||u2.team!==2)continue;if(dst(u2,G_enemyHero)<=G_enemyHero.auraR){u2.hp=Math.min(u2.maxHp,u2.hp+90);}}
+      spawnRing(G_enemyHero.x,G_enemyHero.z,0xef4444);
+    } else if(G_enemyHero.aura==='overclock'){
+      for(const u2 of G.units){if(!u2.alive||u2.team!==1)continue;if(dst(u2,G_enemyHero)<=G_enemyHero.auraR){dealDmg(G_enemyHero,u2,90);spawnBurst(u2.x,u2.z,0xfbbf24,6,2);}}
+      spawnRing(G_enemyHero.x,G_enemyHero.z,0xef4444);
+    }
+    G_hero=savedHero;
+  }
+  // Wave banner fade
+  if(G_waveBannerT>0)G_waveBannerT-=dt;
   G.uiT+=dt;if(G.uiT>0.4){G.uiT=0;updateBuildUI();updateHeroUI();}
   if(G_hero&&G_hero.alive&&G_hero.abilityT>0)G_hero.abilityT=Math.max(0,G_hero.abilityT-dt);
   if(G_enemyHero&&G_enemyHero.alive&&G_enemyHero.abilityT>0)G_enemyHero.abilityT=Math.max(0,G_enemyHero.abilityT-dt);
@@ -2318,6 +2420,7 @@ raceKeys.forEach((rk)=>{
       <div class="rtag">${RACE_TAG[rk]}</div>
       <h3 style="color:${rd.color}">${rd.name}</h3>
       <p>${rd.desc}</p>
+      <p style="font-size:10px;color:#5b4a8f;margin-top:4px;line-height:1.35">${LORE[rk]}</p>
       <div class="stats"><span>POP <b>${rd.pop}</b></span><span>ESS <b>${rd.ess}</b></span><span>UNITÉS <b>${rd.units.length}</b></span></div>
       <div class="stats" style="margin-top:4px"><span style="color:${rd.color}">⚜ HÉROS</span> <b style="color:#b8a9e0">${hd.name}</b></div>
     </div>`;
