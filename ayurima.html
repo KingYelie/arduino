@@ -365,8 +365,21 @@ function spawnHealOrb(x,z,col){
   }
 }
 function updateParticles(dt){
+  const ambT=performance.now()/1000;
   for(const p of PARTS){
     if(p.done)continue;
+    if(p.ambient){
+      // Floating ambient orb — never dies, bobs gently
+      p.mesh.position.x+=p.vx*dt;p.mesh.position.z+=p.vz*dt;
+      p.mesh.position.y=p.baseY+Math.sin(ambT*0.8+p.phase)*0.6;
+      p.mesh.material.opacity=0.15+0.25*Math.abs(Math.sin(ambT*0.5+p.phase));
+      // Wrap around map
+      if(p.mesh.position.x>MAP/2)p.mesh.position.x=-MAP/2;
+      if(p.mesh.position.x<-MAP/2)p.mesh.position.x=MAP/2;
+      if(p.mesh.position.z>MAP/2)p.mesh.position.z=-MAP/2;
+      if(p.mesh.position.z<-MAP/2)p.mesh.position.z=MAP/2;
+      continue;
+    }
     p.life-=dt;
     if(p.life<=0){scene.remove(p.mesh);p.done=true;continue;}
     const alpha=Math.max(0,p.life/p.maxLife);
@@ -646,6 +659,25 @@ for(let i=0;i<=GRID;i++){const p=i/GRID*512;gctx.beginPath();gctx.moveTo(p,0);gc
 const gtex=new THREE.CanvasTexture(gcv);
 const govl=new THREE.Mesh(new THREE.PlaneGeometry(MAP,MAP),new THREE.MeshBasicMaterial({map:gtex,transparent:true,opacity:0.6,depthWrite:false}));
 govl.rotation.x=-PI/2;govl.position.y=0.01;scene.add(govl);
+
+// Map border monoliths
+(function(){
+  const bm=new THREE.MeshPhongMaterial({color:0x2d1a5e,emissive:0x1a0f3a,shininess:40,transparent:true,opacity:0.7});
+  const HALF=MAP/2;
+  const N=18;
+  for(let s of[-1,1])for(let i=0;i<N;i++){
+    const t=(i/(N-1))*MAP-HALF;
+    for(const[ax,az]of[[t,s*HALF],[s*HALF,t]]){
+      if(Math.abs(ax)===HALF&&Math.abs(az)===HALF)continue;
+      const h=rr(2.5,5.5);
+      const pill=new THREE.Mesh(new THREE.CylinderGeometry(rr(0.18,0.38),rr(0.22,0.45),h,5),bm.clone());
+      pill.position.set(ax,h/2,az);
+      const gem=new THREE.Mesh(new THREE.OctahedronGeometry(0.2),new THREE.MeshBasicMaterial({color:0x7c3aed,transparent:true,opacity:0.9}));
+      gem.position.y=h/2+0.22;pill.add(gem);
+      scene.add(pill);
+    }
+  }
+})();
 
 // HUD canvas (for floating numbers, health bars etc.)
 const hcv=document.createElement('canvas');
@@ -1007,7 +1039,8 @@ function spawnMines(){
     const mat=new THREE.MeshPhongMaterial({color:0xa78bfa,emissive:0x3b0fa0,shininess:80,transparent:true,opacity:1.0});
     const m=new THREE.Mesh(geo,mat);
     m.position.set(mx,0.75,mz);scene.add(m);
-    G.mines.push({x:mx,z:mz,mesh:m,ess:rr(40,70)|0,regen:0.12,maxEss:70,timer:0});
+    const ml=new THREE.PointLight(0xa78bfa,1.5,10);ml.position.set(mx,2,mz);scene.add(ml);
+    G.mines.push({x:mx,z:mz,mesh:m,ess:rr(40,70)|0,regen:0.12,maxEss:70,timer:0,light:ml});
   }
 }
 
@@ -1046,8 +1079,10 @@ function spawnBase(race,x,z,team){
   g.position.set(x,0,z);
   g.traverse(c=>{if(c.isMesh){c.castShadow=true;c.receiveShadow=true;}});
   scene.add(g);
+  const rCol=new THREE.Color(RACES[race].color);
+  const pl=new THREE.PointLight(rCol,2.2,35);pl.position.set(x,6,z);scene.add(pl);
   const hp=team===1?700:550;
-  const b={id:G.nid++,typeId:'base',name:team===1?'QG Allié':'QG Ennemi',team,x,z,hp,maxHp:hp,mesh:g,alive:true,isBase:true,vr:14};
+  const b={id:G.nid++,typeId:'base',name:team===1?'QG Allié':'QG Ennemi',team,x,z,hp,maxHp:hp,mesh:g,alive:true,isBase:true,vr:14,light:pl};
   G.blds.push(b);return b;
 }
 
@@ -1084,7 +1119,10 @@ function spawnPBld(typeId,wx,wz,team){
   g.position.set(wx,0,wz);
   g.traverse(c=>{if(c.isMesh){c.castShadow=true;c.receiveShadow=true;}});
   scene.add(g);
-  const b={id:G.nid++,typeId,name:def.name,def,team,x:wx,z:wz,hp,maxHp:hp,mesh:g,alive:true,isPBld:true,queue:[],rally:null,vr:10};
+  const raceId=team===1?G.race:G.er;
+  const bCol=new THREE.Color(RACES[raceId].color);
+  const pl=new THREE.PointLight(bCol,1.4,18);pl.position.set(wx,4,wz);scene.add(pl);
+  const b={id:G.nid++,typeId,name:def.name,def,team,x:wx,z:wz,hp,maxHp:hp,mesh:g,alive:true,isPBld:true,queue:[],rally:null,vr:10,light:pl};
   G.pblds.push(b);
   return b;
 }
@@ -1228,6 +1266,21 @@ function spawnWave(){
     const ex=eb.x+rr(-5,5),ez=eb.z+rr(-5,5);
     setTimeout(()=>{if(!G.over)spawnUnit(ud.id,G.er,ex,ez,2);},i*300);
   }
+  // Boss unit every 5 waves
+  if(G.wave>0&&G.wave%5===0){
+    const elites=rd.units.filter(u=>u.pop>=3);
+    const boss=elites.length?elites[elites.length-1]:rd.units[rd.units.length-1];
+    const bossCount=Math.floor(G.wave/5);
+    for(let b=0;b<bossCount;b++){
+      setTimeout(()=>{
+        if(G.over)return;
+        const bx=eb.x+rr(-3,3),bz=eb.z+rr(-3,3);
+        const u=spawnUnit(boss.id,G.er,bx,bz,2);
+        if(u){u.atk=Math.floor(u.atk*1.6);u.maxHp=Math.floor(u.maxHp*2.2);u.hp=u.maxHp;u.spd*=0.85;u.mesh.scale.setScalar(1.8);}
+      },count*300+b*600);
+    }
+    toast('💀 UNITÉ D\'ÉLITE en approche! (Vague '+G.wave+')',3500);
+  }
   if(G.wave<=2||G.wave%2===0){
     const bldgs=rd.bldgs;
     const toBuild=bldgs.filter(b=>{
@@ -1286,6 +1339,7 @@ function dealDmg(attacker,target,amount){
       target.alive=false;
       scene.remove(target.mesh);
       if(target.rallyMesh)scene.remove(target.rallyMesh);
+      if(target.light)scene.remove(target.light);
       spawnBurst(target.x,target.z,target.team===1?0x3b82f6:0xef4444,20,4);
       for(let i=0;i<3;i++)spawnRing(target.x+rr(-1,1),target.z+rr(-1,1),0xff6600);
       if(G_hero&&G_hero.alive&&target.team===2)gainXP(G_hero,40);
@@ -1312,6 +1366,9 @@ function dealDmg(attacker,target,amount){
       target.alive=false;
       target.hp=0;
       scene.remove(target.mesh);
+      if(target.light)scene.remove(target.light);
+      spawnBurst(target.x,target.z,0xff6600,40,6);
+      for(let i=0;i<5;i++)setTimeout(()=>{if(!G.over)spawnRing(target.x+rr(-3,3),target.z+rr(-3,3),0xff6600);},i*200);
       if(target.team===1){endGame(false);}
       else{endGame(true);}
     }
@@ -1476,12 +1533,14 @@ function moveToward(u,tx,tz,dt){
 
 // ── MINES UPDATE ──────────────────────────────────────────────────────────
 function updateMines(dt){
+  const mt=performance.now()/1000;
   for(const m of G.mines){
     m.mesh.rotation.y+=dt*0.6;
     if(m.ess<m.maxEss){m.ess=Math.min(m.maxEss,m.ess+m.regen*dt);}
     const t=m.ess/m.maxEss;
     m.mesh.material.opacity=0.3+0.7*t;
     m.mesh.material.emissiveIntensity=t;
+    if(m.light){m.light.intensity=(0.8+0.7*Math.sin(mt*2.2+m.x))*t;}
   }
 }
 
@@ -1532,9 +1591,20 @@ function drawMinimap(){
   for(const u of G.units){
     if(!u.alive)continue;
     const p=toMM(u.x,u.z);
-    mmCtx.fillStyle=u.team===1?'#4ade80':'#f87171';
-    mmCtx.fillRect(p.mx-1,p.mz-1,2,2);
+    if(u.isHero){
+      mmCtx.fillStyle=u.team===1?'#ffd700':'#ff2222';
+      mmCtx.beginPath();mmCtx.arc(p.mx,p.mz,3.5,0,Math.PI*2);mmCtx.fill();
+      mmCtx.strokeStyle=u.team===1?'#fff8dc':'#ffaaaa';mmCtx.lineWidth=0.8;mmCtx.stroke();
+    } else {
+      mmCtx.fillStyle=u.team===1?'#4ade80':'#f87171';
+      mmCtx.fillRect(p.mx-1,p.mz-1,2,2);
+    }
   }
+  // Wave progress bar at bottom of minimap
+  const wPct=Math.min(1,G.waveT/G.waveInt);
+  mmCtx.fillStyle='rgba(0,0,0,0.5)';mmCtx.fillRect(0,126,130,4);
+  mmCtx.fillStyle=wPct>0.8?'#ef4444':'#7c3aed';
+  mmCtx.fillRect(0,126,130*wPct,4);
   const vc=toMM(cam.x,cam.z);
   mmCtx.strokeStyle='rgba(255,255,255,0.3)';mmCtx.lineWidth=1;
   mmCtx.strokeRect(vc.mx-12,vc.mz-10,24,20);
@@ -1575,6 +1645,9 @@ function startGame(){
   for(const p of G.projs)scene.remove(p.mesh);
 
   G_hero=null;G_enemyHero=null;G_kills=0;
+  // Remove old ambient particles from previous game
+  for(const p of PARTS){if(p.ambient&&p.mesh){scene.remove(p.mesh);p.done=true;}}
+  PARTS.length=0;
   const kd=document.getElementById('kill-count');if(kd)kd.textContent='⚔ 0';
   G.pblds=[];G.selBld=null;G.floats=[];G.uiT=0;
   G.ess=RACES[G.race].ess;
@@ -1593,6 +1666,16 @@ function startGame(){
   }
 
   spawnMines();
+  // Ambient floating orbs
+  for(let i=0;i<30;i++){
+    const ax=rr(-MAP/2+5,MAP/2-5),az=rr(-MAP/2+5,MAP/2-5);
+    const geo=new THREE.SphereGeometry(rr(0.05,0.14),4,4);
+    const ambCol=new THREE.Color().setHSL(0.72+Math.random()*0.15,0.8,0.5);
+    const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:ambCol,transparent:true,opacity:rr(0.2,0.55)}));
+    m.position.set(ax,rr(0.5,4),az);
+    scene.add(m);
+    PARTS.push({mesh:m,vx:rr(-0.15,0.15),vy:rr(0.05,0.2),vz:rr(-0.15,0.15),life:Infinity,maxLife:1,ambient:true,baseY:m.position.y,phase:Math.random()*Math.PI*2});
+  }
   spawnTerrain();
   spawnRaceDecor(G.race,0,65,22);
   spawnRaceDecor(G.er,0,-65,22);
@@ -1653,7 +1736,9 @@ function buyTech(tid){
 
 // ── UI ─────────────────────────────────────────────────────────────────────
 function updateHUD(){
-  document.getElementById('ess').textContent='✦ '+G.ess;
+  const harvestors=G.units.filter(u=>u.alive&&u.team===1&&u.harvester&&u.harv);
+  const incomeRate=harvestors.length*Math.round((10/3.5)*10)/10;
+  document.getElementById('ess').textContent='✦ '+G.ess+(incomeRate>0?' +'+incomeRate.toFixed(0)+'/s':'');
   document.getElementById('pop').textContent='⬡ '+G.pop+'/'+G.maxPop;
   const wCd=Math.max(0,Math.ceil(G.waveInt-G.waveT));
   document.getElementById('wave').textContent='Vague '+G.wave+' ⟶ '+wCd+'s';
@@ -1672,14 +1757,18 @@ function updateSelUI(){
   const u=G.units.find(u=>u.id===G.sel[0]);
   if(!u){ifo.innerHTML='';return;}
   const hp=u.maxHp>0?(u.hp/u.maxHp*100).toFixed(0):0;
+  const shieldBar=u.shield&&u.shield>0?`<div style="font-size:9px;color:#818cf8;margin-top:2px">🛡 Bouclier: ${u.shield}</div>`:'';
+  const poisonBar=u.poisonT&&u.poisonT>0?`<div style="font-size:9px;color:#4ade80;margin-top:2px">☠ Empoisonné: ${u.poisonT.toFixed(1)}s</div>`:'';
+  const heroTag=u.isHero?`<div style="font-size:8px;color:#ffd700;font-family:'Share Tech Mono';margin-bottom:3px">⭐ HÉROS — Niv.${u.level} · XP ${u.xp}</div>`:'';
   ifo.innerHTML=`
-    <div style="font-size:12px;font-weight:700;color:#c4b5fd;margin-bottom:4px">${u.name} ×${G.sel.length}</div>
-    <div style="background:#1a0f3a;height:6px;border-radius:3px;overflow:hidden;margin-bottom:4px">
-      <div style="width:${hp}%;height:100%;background:linear-gradient(90deg,#ef4444,#fde047,#4ade80);background-size:200%"></div>
+    ${heroTag}
+    <div style="font-size:12px;font-weight:700;color:#c4b5fd;margin-bottom:3px">${u.name}${G.sel.length>1?' ×'+G.sel.length:''}</div>
+    <div style="background:#1a0f3a;height:5px;border-radius:3px;overflow:hidden;margin-bottom:3px">
+      <div style="width:${hp}%;height:100%;background:${u.shield&&u.shield>0?'linear-gradient(90deg,#818cf8,#c4b5fd)':'linear-gradient(90deg,#ef4444,#fde047,#4ade80)'};border-radius:3px"></div>
     </div>
-    <div style="font-size:10px;color:#6b5fa0">HP: ${u.hp|0}/${u.maxHp} | ATK: ${u.atk}</div>
-    <div style="font-size:10px;color:#6b5fa0">RNG: ${u.rng.toFixed(1)} | SPD: ${u.spd.toFixed(1)}</div>
-    ${G.sel.length>1?`<div style="font-size:10px;color:#3d2f6e;margin-top:3px">${G.sel.length} unités sélectionnées</div>`:''}
+    <div style="font-size:10px;color:#6b5fa0">HP ${u.hp|0}/${u.maxHp} · ATK ${u.atk} · RNG ${u.rng.toFixed(1)}</div>
+    ${shieldBar}${poisonBar}
+    ${G.sel.length>1?`<div style="font-size:10px;color:#3d2f6e;margin-top:3px">Groupe: ${G.sel.length} unités</div>`:''}
   `;
 }
 
@@ -1959,8 +2048,16 @@ function drawHUD(dt){
     const pct=u.hp/u.maxHp;
     hctx.fillStyle='rgba(0,0,0,0.5)';
     hctx.fillRect(sp.x-w/2,sp.y-14,w,h);
-    hctx.fillStyle=u.team===1?`hsl(${120*pct},80%,45%)`:'#ef4444';
-    hctx.fillRect(sp.x-w/2,sp.y-14,w*pct,h);
+    if(u.shield&&u.shield>0){
+      hctx.fillStyle='#818cf8';
+      hctx.fillRect(sp.x-w/2,sp.y-14,w*pct,h);
+    } else if(u.poisonT&&u.poisonT>0){
+      hctx.fillStyle=`hsl(120,80%,35%)`;
+      hctx.fillRect(sp.x-w/2,sp.y-14,w*pct,h);
+    } else {
+      hctx.fillStyle=u.team===1?`hsl(${120*pct},80%,45%)`:'#ef4444';
+      hctx.fillRect(sp.x-w/2,sp.y-14,w*pct,h);
+    }
     if(G.sel.includes(u.id)){
       hctx.strokeStyle='#4ade80';hctx.lineWidth=1.5;
       hctx.strokeRect(sp.x-14,sp.y-12,28,24);
@@ -2163,9 +2260,42 @@ function loop(t){
   G.uiT+=dt;if(G.uiT>0.4){G.uiT=0;updateBuildUI();updateHeroUI();}
   if(G_hero&&G_hero.alive&&G_hero.abilityT>0)G_hero.abilityT=Math.max(0,G_hero.abilityT-dt);
   if(G_enemyHero&&G_enemyHero.alive&&G_enemyHero.abilityT>0)G_enemyHero.abilityT=Math.max(0,G_enemyHero.abilityT-dt);
+  // Update base lights based on HP
+  for(const b of G.blds){
+    if(b.light&&b.alive){
+      const pct=b.hp/b.maxHp;
+      const t2=performance.now()/1000;
+      b.light.intensity=(1.5+0.7*Math.sin(t2*1.5))*pct;
+    }
+  }
   updateHUD();
   drawHUD(dt);
   drawMinimap();
+  // Draw hero aura on HUD canvas
+  if(G_hero&&G_hero.alive){
+    const sp=worldToScreen(G_hero.x,G_hero.z);
+    if(sp&&sp.z<1){
+      const t=performance.now()/1000;
+      const pulse=0.55+0.35*Math.sin(t*2.5);
+      hctx.save();
+      hctx.strokeStyle=`rgba(255,215,0,${pulse})`;
+      hctx.lineWidth=2;
+      hctx.beginPath();hctx.arc(sp.x,sp.y+6,22,0,Math.PI*2);hctx.stroke();
+      hctx.restore();
+    }
+  }
+  if(G_enemyHero&&G_enemyHero.alive){
+    const sp=worldToScreen(G_enemyHero.x,G_enemyHero.z);
+    if(sp&&sp.z<1){
+      const t=performance.now()/1000;
+      const pulse=0.55+0.35*Math.sin(t*2.5+Math.PI);
+      hctx.save();
+      hctx.strokeStyle=`rgba(255,50,50,${pulse})`;
+      hctx.lineWidth=2;
+      hctx.beginPath();hctx.arc(sp.x,sp.y+6,22,0,Math.PI*2);hctx.stroke();
+      hctx.restore();
+    }
+  }
 }
 requestAnimationFrame(loop);
 
