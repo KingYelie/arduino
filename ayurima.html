@@ -92,6 +92,17 @@ h1::after{content:'AYURIMA';position:absolute;left:0;top:0;color:#22d3ee;opacity
 .tbtn.dis{opacity:.35;cursor:not-allowed;}
 .sbar{height:4px;background:#1a0f3a;border-radius:2px;overflow:hidden;margin-top:2px;}
 .sbar-f{height:100%;background:linear-gradient(90deg,#7c3aed,#06b6d4);}
+#hero-panel{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);width:220px;background:rgba(6,2,18,.94);border:1px solid #7c3aed;border-radius:10px;padding:9px 11px;display:none;flex-direction:column;z-index:7;pointer-events:all;}
+#hero-panel .hp-bar{height:5px;background:#1a0f3a;border-radius:3px;margin:4px 0;overflow:hidden;}
+#hero-panel .hp-fill{height:100%;background:linear-gradient(90deg,#7c3aed,#38bdf8);border-radius:3px;transition:width .3s;}
+#hero-panel .xp-bar{height:3px;background:#1a0f3a;border-radius:2px;margin:2px 0;overflow:hidden;}
+#hero-panel .xp-fill{height:100%;background:linear-gradient(90deg,#fbbf24,#f59e0b);border-radius:2px;transition:width .3s;}
+.abt{width:100%;padding:5px 8px;background:linear-gradient(135deg,rgba(79,29,150,.85),rgba(29,78,216,.85));border:1px solid #a78bfa;color:#e9d5ff;border-radius:5px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.5px;cursor:pointer;margin-top:5px;transition:.15s;position:relative;overflow:hidden;}
+.abt:hover{filter:brightness(1.3);}
+.abt.cd{background:rgba(10,5,20,.8);border-color:#2d1f5e;color:#4b3d78;cursor:not-allowed;}
+.abt .cd-fill{position:absolute;left:0;top:0;height:100%;background:rgba(124,58,237,.18);transition:width .1s;}
+#kill-count{color:#fde047;}
+#atkmove-hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-size:13px;color:#f87171;letter-spacing:3px;pointer-events:none;z-index:20;text-shadow:0 0 10px #f87171;display:none;}
 #over{display:none;}
 .over-title{font-size:36px;font-weight:900;margin-bottom:12px;}
 .win{color:#4ade80;}.lose{color:#f87171;}
@@ -109,12 +120,15 @@ h1::after{content:'AYURIMA';position:absolute;left:0;top:0;color:#22d3ee;opacity
     <div class="hres" id="pop">⬡ 0/0</div>
     <div class="hres" id="wave">Vague 0</div>
     <div class="hres" id="timer" style="color:#94a3b8">00:00</div>
+    <div class="hres" id="kill-count">⚔ 0</div>
   </div>
   <div id="panel" style="display:none"></div>
   <div id="ifo" style="display:none"></div>
   <div id="log"></div>
 </div>
 
+<div id="hero-panel"></div>
+<div id="atkmove-hint">CIBLE D'ATTAQUE</div>
 <div id="minimap" style="position:fixed;bottom:10px;right:10px;z-index:6;display:none">
   <div style="font-size:8px;letter-spacing:1px;color:#3d2f6e;text-align:center;margin-bottom:2px">CARTE</div>
   <canvas id="mmcv" width="130" height="130" style="border:1px solid #1a0f3a;border-radius:6px;display:block;cursor:crosshair"></canvas>
@@ -312,6 +326,221 @@ const HEROES={
     desc:'Titan d\'artillerie. Frappes longue portée dévastatrices.'}
 };
 
+// ── ABILITY NAMES & HERO PROGRESSION ────────────────────────────────────
+const ABILITY_NAMES={nexus:'Bouclier Énergie',vide:'Drain Vital',cristal:'Soin de Cristal',synth:'Frappe Orbitale'};
+const HERO_XP=[0,120,300,620,1100,1900]; // XP thresholds for levels 1-5
+
+// ── PARTICLE SYSTEM ──────────────────────────────────────────────────────
+const PARTS=[];
+function spawnBurst(x,z,col,n,spd){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2;
+    const v=spd*(0.4+Math.random()*0.7);
+    const sz=0.05+Math.random()*0.09;
+    const geo=new THREE.SphereGeometry(sz,3,3);
+    const mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:1});
+    const m=new THREE.Mesh(geo,mat);
+    m.position.set(x+rr(-0.3,0.3),rr(0.1,0.7),z+rr(-0.3,0.3));
+    scene.add(m);
+    PARTS.push({mesh:m,vx:Math.cos(a)*v,vy:rr(1,3.5),vz:Math.sin(a)*v,life:rr(0.4,1.0),maxLife:1});
+  }
+}
+function spawnRing(x,z,col){
+  const geo=new THREE.RingGeometry(0.1,0.4,16);
+  const mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.9,side:THREE.DoubleSide});
+  const m=new THREE.Mesh(geo,mat);
+  m.rotation.x=-Math.PI/2;m.position.set(x,0.05,z);
+  scene.add(m);
+  PARTS.push({mesh:m,vx:0,vy:0,vz:0,life:0.5,maxLife:0.5,ring:true,scaleSpd:6});
+}
+function spawnHealOrb(x,z,col){
+  for(let i=0;i<4;i++){
+    const a=i/4*Math.PI*2;
+    const geo=new THREE.SphereGeometry(0.1,5,5);
+    const mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.9});
+    const m=new THREE.Mesh(geo,mat);
+    m.position.set(x+Math.cos(a)*0.5,0.3,z+Math.sin(a)*0.5);
+    scene.add(m);
+    PARTS.push({mesh:m,vx:0,vy:2.2,vz:0,life:0.7,maxLife:0.7});
+  }
+}
+function updateParticles(dt){
+  for(const p of PARTS){
+    if(p.done)continue;
+    p.life-=dt;
+    if(p.life<=0){scene.remove(p.mesh);p.done=true;continue;}
+    const alpha=Math.max(0,p.life/p.maxLife);
+    p.mesh.material.opacity=alpha;
+    if(p.ring){
+      const s=1+(1-alpha)*p.scaleSpd;
+      p.mesh.scale.setScalar(s);
+    } else {
+      p.mesh.position.x+=p.vx*dt;
+      p.mesh.position.y+=p.vy*dt;
+      p.mesh.position.z+=p.vz*dt;
+      p.vy-=9*dt;
+      p.mesh.scale.setScalar(alpha*0.9+0.1);
+    }
+  }
+  for(let i=PARTS.length-1;i>=0;i--)if(PARTS[i].done)PARTS.splice(i,1);
+}
+
+// ── HERO SYSTEM ──────────────────────────────────────────────────────────
+let G_hero=null,G_kills=0,G_enemyHero=null;
+
+function spawnHero(raceId,team){
+  team=team||1;
+  const hd=HEROES[raceId];
+  if(team===1){
+    if(G_hero&&G_hero.alive){toast('Héros déjà sur le terrain!');return;}
+    if(G.ess<hd.cost){toast('Essence insuffisante! ('+hd.cost+')');return;}
+    if(G.pop+hd.pop>G.maxPop){toast('Population insuffisante!');return;}
+    G.ess-=hd.cost;
+  }
+  const pb=team===1?getPBase():getEBase();
+  const x=pb?pb.x+rr(-2,2):0,z=pb?pb.z+rr(-2,2):(team===1?65:-65);
+  SPIN_OFF=true;
+  const g=mkHeroMesh(raceId);
+  SPIN_OFF=false;
+  g.position.set(x,0,z);
+  g.scale.setScalar(team===1?1.4:1.2);
+  g.traverse(c=>{if(c.isMesh)c.castShadow=true;});
+  scene.add(g);
+  const ringCol=team===1?0xffd700:0xff4444;
+  const teamRing=new THREE.Mesh(new THREE.TorusGeometry(0.55,0.1,5,14),new THREE.MeshBasicMaterial({color:ringCol}));
+  teamRing.rotation.x=Math.PI/2;teamRing.position.y=-0.12;g.add(teamRing);
+  const u={
+    id:G.nid++,uid:hd.id,name:hd.name,race:raceId,team,
+    x,z,hp:hd.hp,maxHp:hd.hp,
+    atk:Math.floor(hd.atk*(team===1?1:G.eb.em)),
+    rng:hd.rng,spd:hd.spd,rep:hd.rep,repT:0,
+    mesh:g,sz:0.8,alive:true,harvester:false,stationary:false,
+    dest:null,target:null,harvT:0,harv:null,poisonT:0,sdb:0,pop:hd.pop,
+    isHero:true,xp:0,level:1,
+    abilityT:0,abilityCd:18,aura:hd.aura,auraR:hd.auraR
+  };
+  G.units.push(u);
+  G.pop+=hd.pop;
+  if(team===1){G_hero=u;SND.build();toast('⚔ '+hd.name+' déployé! [Q] pour capacité',2500);}
+  else {G_enemyHero=u;}
+  return u;
+}
+
+function gainXP(u,amount){
+  if(!u||!u.isHero||u.level>=5)return;
+  u.xp+=amount;
+  while(u.level<5&&u.xp>=HERO_XP[u.level]){
+    u.level++;
+    const hpGain=Math.floor(u.maxHp*0.18);
+    u.maxHp+=hpGain;u.hp=Math.min(u.hp+hpGain,u.maxHp);
+    u.atk=Math.floor(u.atk*1.14);
+    u.abilityCd=Math.max(10,u.abilityCd-2);
+    if(u.team===1){
+      toast('⭐ '+u.name+' — Niveau '+u.level+'!',2500);
+      spawnBurst(u.x,u.z,0xffd700,24,3.5);
+    }
+  }
+}
+
+function useHeroAbility(){
+  if(!G_hero||!G_hero.alive){toast('Aucun héros actif');return;}
+  if(G_hero.abilityT>0){toast('Recharge: '+Math.ceil(G_hero.abilityT)+'s',800);return;}
+  G_hero.abilityT=G_hero.abilityCd;
+  if(G_hero.aura==='shield'){
+    let cnt=0;
+    for(const u of G.units){
+      if(!u.alive||u.team!==1)continue;
+      if(dst(u,G_hero)<=G_hero.auraR){u.shield=(u.shield||0)+70;u.shieldT=9;cnt++;}
+    }
+    spawnBurst(G_hero.x,G_hero.z,0x818cf8,22,3);
+    spawnRing(G_hero.x,G_hero.z,0x818cf8);
+    toast('⚡ Bouclier d\'Énergie! '+cnt+' unités protégées',2000);
+  } else if(G_hero.aura==='frenzy'){
+    let best=null,bd=14;
+    for(const u of G.units){if(!u.alive||u.team!==2)continue;const d=dst(u,G_hero);if(d<bd){bd=d;best=u;}}
+    for(const b of [...G.blds,...G.pblds]){if(!b.alive||b.team!==2)continue;const d=dst2(G_hero.x,G_hero.z,b.x,b.z);if(d<bd){bd=d;best=b;}}
+    if(best){
+      const drain=Math.min(best.hp,180);
+      best.hp-=drain;
+      G_hero.hp=Math.min(G_hero.maxHp,G_hero.hp+drain);
+      G.ess=Math.min(9999,G.ess+40);
+      spawnBurst(best.x||0,best.z||0,0xf87171,16,2.5);
+      spawnHealOrb(G_hero.x,G_hero.z,0xf87171);
+      spawnRing(G_hero.x,G_hero.z,0xf87171);
+      toast('🩸 Drain Vital: +'+drain+' PV volés!',2000);
+      if(best.hp<=0){
+        if(best.isBase){endGame(true);}
+        else if(!best.isPBld&&best.alive!==undefined)removeUnit(best);
+        else if(best.isPBld){best.alive=false;scene.remove(best.mesh);if(best.rallyMesh)scene.remove(best.rallyMesh);}
+      }
+    } else toast('Aucune cible à portée!',1000);
+  } else if(G_hero.aura==='heal'){
+    let total=0;
+    for(const u of G.units){
+      if(!u.alive||u.team!==1)continue;
+      if(dst(u,G_hero)<=G_hero.auraR){
+        const h=Math.min(u.maxHp-u.hp,90);u.hp+=h;total+=h;
+        spawnHealOrb(u.x,u.z,0x67e8f9);
+      }
+    }
+    spawnBurst(G_hero.x,G_hero.z,0x67e8f9,18,2.5);
+    spawnRing(G_hero.x,G_hero.z,0x67e8f9);
+    toast('💎 Soin de Cristal: +'+total+' PV restaurés!',2000);
+  } else if(G_hero.aura==='overclock'){
+    const range=G_hero.auraR;let cnt=0;
+    for(const u of G.units){
+      if(!u.alive||u.team!==2)continue;
+      if(dst(u,G_hero)<=range){
+        const dmg=90+G_hero.level*25;
+        dealDmg(G_hero,u,dmg);
+        spawnBurst(u.x,u.z,0xfbbf24,8,2);cnt++;
+      }
+    }
+    for(const b of [...G.blds,...G.pblds]){
+      if(!b.alive||b.team!==2)continue;
+      if(dst2(G_hero.x,G_hero.z,b.x,b.z)<=range){
+        dealDmg(G_hero,b,70);spawnBurst(b.x,b.z,0xfbbf24,10,2.5);
+      }
+    }
+    spawnBurst(G_hero.x,G_hero.z,0xfbbf24,30,5);
+    spawnRing(G_hero.x,G_hero.z,0xfbbf24);
+    toast('🤖 Frappe Orbitale! '+cnt+' unités touchées!',2000);
+    SND.wave();
+  }
+}
+
+function updateHeroUI(){
+  const hp=document.getElementById('hero-panel');
+  if(!hp)return;
+  if(!G.running||!G_hero||!G_hero.alive){hp.style.display='none';return;}
+  hp.style.display='flex';
+  const hd=HEROES[G_hero.race];
+  const hpPct=(G_hero.hp/G_hero.maxHp*100).toFixed(1);
+  const xpNeed=G_hero.level<5?HERO_XP[G_hero.level]:HERO_XP[4];
+  const xpPrev=G_hero.level>1?HERO_XP[G_hero.level-1]:0;
+  const xpRange=xpNeed-xpPrev;
+  const xpPct=G_hero.level>=5?100:Math.min(100,((G_hero.xp-xpPrev)/xpRange*100)).toFixed(0);
+  const cdPct=G_hero.abilityT>0?(G_hero.abilityT/G_hero.abilityCd*100).toFixed(0):0;
+  const cdReady=G_hero.abilityT<=0;
+  hp.innerHTML=`
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+      <div style="font-size:9px;font-family:'Share Tech Mono';color:#ffd700;letter-spacing:1px">LV.${G_hero.level}</div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;color:#e9d5ff;font-family:'Orbitron'">${G_hero.name}</div>
+        <div style="font-size:8px;color:#6b5fa0">${hd.title}</div>
+      </div>
+      <div style="font-size:9px;color:#4ade80">HP ${G_hero.hp|0}/${G_hero.maxHp}</div>
+    </div>
+    <div class="hp-bar"><div class="hp-fill" style="width:${hpPct}%"></div></div>
+    <div class="xp-bar"><div class="xp-fill" style="width:${xpPct}%"></div></div>
+    <div style="font-size:7px;color:#4b3d78;font-family:'Share Tech Mono';margin-bottom:2px">XP ${G_hero.xp} / ${G_hero.level<5?xpNeed:'MAX'} · ATK ${G_hero.atk} · RNG ${G_hero.rng}</div>
+    <button class="abt${cdReady?'':' cd'}" onclick="useHeroAbility()">
+      ${cdReady?'':`<div class="cd-fill" style="width:${100-cdPct}%"></div>`}
+      <span style="position:relative">${cdReady?'⚡ '+ABILITY_NAMES[G_hero.race]:'⏳ '+Math.ceil(G_hero.abilityT)+'s — '+ABILITY_NAMES[G_hero.race]}</span>
+    </button>
+  `;
+}
+
 // ── CAMPAIGN PERSISTENCE ──────────────────────────────────────────────────
 function getUnlocked(){
   try{return JSON.parse(localStorage.getItem('ayurima_unlocked')||'["m1"]');}
@@ -429,9 +658,24 @@ resizeHUD();
 // Camera control
 const cam={x:0,z:0,zoom:22,rot:0};
 let keys={};
+let attackMoveMode=false;
 window.addEventListener('keydown',e=>{
   keys[e.code]=true;
-  if(e.code==='Escape'&&G.running){G.sel=[];G.selBld=null;G.rallyMode=false;updateSelUI();updateBuildUI();}
+  if(!G.running)return;
+  if(e.code==='Escape'){
+    G.sel=[];G.selBld=null;G.rallyMode=false;attackMoveMode=false;
+    document.getElementById('atkmove-hint').style.display='none';
+    updateSelUI();updateBuildUI();
+  }
+  if(e.code==='KeyA'&&G.sel.length>0){
+    attackMoveMode=true;
+    document.getElementById('atkmove-hint').style.display='block';
+  }
+  if(e.code==='KeyH')spawnHero(G.race);
+  if(e.code==='KeyQ')useHeroAbility();
+  if(e.code==='KeyF'&&G_hero&&G_hero.alive&&G.sel.length===0){
+    G.sel=[G_hero.id];updateSelUI();SND.sel();
+  }
 });
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 window.addEventListener('resize',()=>{
@@ -949,6 +1193,11 @@ function removeUnit(u){
   G.pop-=u.pop;
   if(G.pop<0)G.pop=0;
   G.sel=G.sel.filter(id=>id!==u.id);
+  if(u.team===2){G_kills++;const kd=document.getElementById('kill-count');if(kd)kd.textContent='⚔ '+G_kills;}
+  spawnBurst(u.x,u.z,u.team===1?0x3b82f6:0xef4444,u.isHero?18:7,u.isHero?4:2);
+  spawnRing(u.x,u.z,u.team===2?0xef4444:0x4ade80);
+  if(u.isHero&&u.team===2){G_enemyHero=null;toast('⚔ Héros ennemi vaincu!',2500);SND.win();}
+  if(u.isHero&&u.team===1){G_hero=null;toast('💀 Votre héros est tombé!',3000);}
 }
 
 // ── AI SPAWN ───────────────────────────────────────────────────────────────
@@ -970,6 +1219,10 @@ function spawnWave(){
   const avail=getAIUnits();
   const count=3+G.wave*2;
   SND.wave();toast('⚔ Vague '+G.wave+' ennemie!',3000);
+  if(G.wave===4&&(!G_enemyHero||!G_enemyHero.alive)){
+    setTimeout(()=>{if(!G.over)spawnHero(G.er,2);},2000);
+    toast('⚠ Héros ennemi en approche!',3000);
+  }
   for(let i=0;i<count;i++){
     const ud=avail[Math.floor(Math.random()*avail.length)];
     const ex=eb.x+rr(-5,5),ez=eb.z+rr(-5,5);
@@ -1015,6 +1268,12 @@ function dealDmg(attacker,target,amount){
     target.poisonT=(target.poisonT||0)+4;
   }
   if(att.sdb>0)amount+=rr(0,att.sdb)|0;
+  if(target.shield&&target.shield>0){
+    const absorbed=Math.min(target.shield,amount);
+    target.shield-=absorbed;amount-=absorbed;
+    if(absorbed>0)addFloat(target.x||0,target.z||0,'🛡'+absorbed,'#818cf8');
+    if(target.shield<=0)target.shieldT=0;
+  }
   target.hp-=amount;
   if(amount>0&&(target.x!==undefined||target.mesh)){
     const tx=target.x!==undefined?target.x:(target.mesh?target.mesh.position.x:0);
@@ -1027,6 +1286,9 @@ function dealDmg(attacker,target,amount){
       target.alive=false;
       scene.remove(target.mesh);
       if(target.rallyMesh)scene.remove(target.rallyMesh);
+      spawnBurst(target.x,target.z,target.team===1?0x3b82f6:0xef4444,20,4);
+      for(let i=0;i<3;i++)spawnRing(target.x+rr(-1,1),target.z+rr(-1,1),0xff6600);
+      if(G_hero&&G_hero.alive&&target.team===2)gainXP(G_hero,40);
       const race=RACES[target.team===1?G.race:G.er];
       let refund=0;
       for(const q of target.queue){refund+=Math.floor(q.cost*0.5);}
@@ -1041,6 +1303,9 @@ function dealDmg(attacker,target,amount){
         if(attacker&&att.de>0&&attacker.team!==target.team){
           G.ess=Math.min(9999,G.ess+(att.de));
         }
+        if(G_hero&&G_hero.alive&&target.team===2){
+          gainXP(G_hero,target.isHero?200:target.pop*8+8);
+        }
         removeUnit(target);
       }
     } else if(target.isBase){
@@ -1054,8 +1319,10 @@ function dealDmg(attacker,target,amount){
 }
 
 function spawnProj(from,to,col,dmg){
-  const geo=new THREE.SphereGeometry(0.12,4,4);
-  const mat=new THREE.MeshBasicMaterial({color:col});
+  const isHero=from&&from.isHero;
+  const sz=isHero?0.22:0.1+Math.min(0.08,dmg/400);
+  const geo=new THREE.SphereGeometry(sz,isHero?6:4,isHero?6:4);
+  const mat=new THREE.MeshBasicMaterial({color:col,transparent:!isHero,opacity:isHero?1:0.9});
   const m=new THREE.Mesh(geo,mat);
   m.position.set(from.x||from.mesh.position.x,0.8,from.z||from.mesh.position.z);
   scene.add(m);
@@ -1127,6 +1394,7 @@ function updateUnits(dt){
     }
     const eff=u.team===1?G.tb:G.eb;
     if(eff.regen>0&&u.hp<u.maxHp){u.hp=Math.min(u.maxHp,u.hp+eff.regen*dt);}
+    if(u.shieldT>0){u.shieldT-=dt;if(u.shieldT<=0){u.shield=0;u.shieldT=0;}}
     u.repT=Math.max(0,u.repT-dt);
     if(u.harvester&&u.team===1){
       if(!u.harv){u.harv=findMine(u);}
@@ -1159,8 +1427,9 @@ function updateUnits(dt){
         }
       } else if(u.dest){
         const d=dst2(u.x,u.z,u.dest.x,u.dest.z);
-        if(d>0.5)moveToward(u,u.dest.x,u.dest.z,dt);
-        else u.dest=null;
+        if(u.attackMove&&u.target){u.dest=null;u.attackMove=false;}
+        else if(d>0.5)moveToward(u,u.dest.x,u.dest.z,dt);
+        else{u.dest=null;u.attackMove=false;}
       } else if(u.team===2){
         const pb=getPBase();
         if(pb)moveToward(u,pb.x+rr(-3,3),pb.z+rr(-3,3),dt);
@@ -1176,6 +1445,25 @@ function updateUnits(dt){
     if(!u.stationary){u.mesh.position.set(u.x,0,u.z);}
   }
   for(const u of G.units){if(!u.alive)continue;if(u.hp<=0)removeUnit(u);}
+}
+
+function separateUnits(){
+  const R=0.85,F=0.28;
+  for(let i=0;i<G.units.length;i++){
+    const a=G.units[i];
+    if(!a.alive||a.stationary)continue;
+    for(let j=i+1;j<G.units.length;j++){
+      const b=G.units[j];
+      if(!b.alive||b.stationary)continue;
+      const dx=a.x-b.x,dz=a.z-b.z;
+      const d=Math.hypot(dx,dz);
+      if(d<R&&d>0.01){
+        const f=F*(R-d)/R;
+        a.x+=dx/d*f;a.z+=dz/d*f;
+        b.x-=dx/d*f;b.z-=dz/d*f;
+      }
+    }
+  }
 }
 
 function moveToward(u,tx,tz,dt){
@@ -1252,6 +1540,31 @@ function drawMinimap(){
   mmCtx.strokeRect(vc.mx-12,vc.mz-10,24,20);
 }
 
+// ── RACE DECORATIONS ──────────────────────────────────────────────────────
+function spawnRaceDecor(race,cx,cz,radius){
+  for(let i=0;i<8;i++){
+    const a=Math.random()*Math.PI*2;
+    const r=radius*0.4+Math.random()*radius*0.55;
+    const x=cx+Math.cos(a)*r,z=cz+Math.sin(a)*r;
+    if(race==='cristal'){
+      const h=rr(1.8,5.5);
+      const m=new THREE.Mesh(new THREE.ConeGeometry(rr(0.18,0.52),h,6),new THREE.MeshPhongMaterial({color:0x67e8f9,emissive:0x0891b2,shininess:130,transparent:true,opacity:rr(0.75,0.92)}));
+      m.position.set(x,h/2,z);m.rotation.y=Math.random()*Math.PI*2;m.rotation.z=rr(-0.12,0.12);m.castShadow=true;scene.add(m);
+    } else if(race==='vide'){
+      const sz=rr(0.4,1.1);
+      const m=new THREE.Mesh(new THREE.DodecahedronGeometry(sz,0),new THREE.MeshPhongMaterial({color:0x7f1d1d,emissive:0x450a0a,shininess:20,transparent:true,opacity:rr(0.6,0.85)}));
+      m.position.set(x,sz*0.4,z);m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);scene.add(m);
+    } else if(race==='nexus'){
+      const h=rr(1.2,3.5);
+      const m=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.12,h,5),new THREE.MeshPhongMaterial({color:0x818cf8,emissive:0x3730a3,shininess:80,transparent:true,opacity:rr(0.5,0.8)}));
+      m.position.set(x,h/2,z);scene.add(m);
+    } else {
+      const m=new THREE.Mesh(new THREE.BoxGeometry(rr(0.3,0.8),rr(0.3,1.2),rr(0.3,0.8)),new THREE.MeshPhongMaterial({color:0xd97706,emissive:0x78350f,shininess:60,transparent:true,opacity:rr(0.55,0.8)}));
+      m.position.set(x,0.3,z);m.rotation.y=Math.random()*Math.PI*2;scene.add(m);
+    }
+  }
+}
+
 // ── START GAME ────────────────────────────────────────────────────────────
 function startGame(){
   // Clear old scene objects except ground, grid, lights
@@ -1261,6 +1574,8 @@ function startGame(){
   for(const m of G.mines)scene.remove(m.mesh);
   for(const p of G.projs)scene.remove(p.mesh);
 
+  G_hero=null;G_enemyHero=null;G_kills=0;
+  const kd=document.getElementById('kill-count');if(kd)kd.textContent='⚔ 0';
   G.pblds=[];G.selBld=null;G.floats=[];G.uiT=0;
   G.ess=RACES[G.race].ess;
   G.pop=0;G.wave=0;G.waveT=0;G.waveInt=40;
@@ -1279,6 +1594,8 @@ function startGame(){
 
   spawnMines();
   spawnTerrain();
+  spawnRaceDecor(G.race,0,65,22);
+  spawnRaceDecor(G.er,0,-65,22);
 
   const pb=spawnBase(G.race,0,65,1);
   const eb=spawnBase(G.er,0,-65,2);
@@ -1349,7 +1666,7 @@ function updateHUD(){
 function updateSelUI(){
   const ifo=document.getElementById('ifo');
   if(!G.sel.length){
-    ifo.innerHTML='<span style="color:#3d2f6e;font-size:10px">Clic gauche: sélectionner<br>Clic droit: déplacer<br>Molette: zoom<br>WASD/Flèches: caméra</span>';
+    ifo.innerHTML='<span style="color:#3d2f6e;font-size:10px;line-height:1.7">Clic gauche: sélectionner<br>Clic droit: déplacer<br>[A] Attack-Move<br>[H] Déployer Héros<br>[Q] Capacité Héros<br>[F] Sélect. Héros<br>[Echap] Désélectionner<br>Molette: zoom · WASD: caméra</span>';
     return;
   }
   const u=G.units.find(u=>u.id===G.sel[0]);
@@ -1457,8 +1774,15 @@ function updateBuildUI(){
     </button>`;
   }
   tHtml+='</div>';
+  const heroReady=!G_hero||!G_hero.alive;
+  const hd2=HEROES[G.race];
   panel.innerHTML=`
     <div style="font-size:10px;font-weight:700;color:#7c3aed;margin-bottom:5px;letter-spacing:.5px">⬡ RACE: ${race.name}</div>
+    ${heroReady?`<button class="pbtn" onclick="spawnHero('${G.race}')" style="border-color:#ffd700;margin-bottom:6px">
+      <div class="pbtn-name" style="color:#ffd700">⭐ ${hd2.name} <span style="color:#4b3d78">(Héros)</span></div>
+      <div class="pbtn-cost">✦ ${hd2.cost} · pop ${hd2.pop}</div>
+      <div class="pbtn-sub">${hd2.desc}</div>
+    </button>`:'<div style="font-size:9px;color:#ffd700;margin-bottom:5px">⭐ '+( G_hero?G_hero.name+' — Niveau '+G_hero.level:'')+(G_hero?' (actif)':'')+'</div>'}
     <div class="panel-sec" style="border-top:none;padding-top:0">
       <div class="sec-hd">BÂTIMENTS</div>
       ${bHtml}
@@ -1581,6 +1905,15 @@ function onMouseUp(e){
     dragStart=null;dragging=false;
     const wp=getWorldPos(e.clientX,e.clientY);
     if(!wp)return;
+    if(attackMoveMode&&G.sel.length>0){
+      attackMoveMode=false;
+      document.getElementById('atkmove-hint').style.display='none';
+      for(const id of G.sel){
+        const u=G.units.find(u=>u.id===id);
+        if(u&&!u.stationary){u.dest={x:wp.x,z:wp.z};u.attackMove=true;}
+      }
+      SND.move();return;
+    }
     for(const pb of G.pblds){
       if(pb.alive&&pb.team===1&&dst2(pb.x,pb.z,wp.x,wp.z)<pb.def.sz+3.5){
         G.selBld=pb.id;G.sel=[];SND.sel();
@@ -1740,6 +2073,9 @@ function returnToMenu(){
   document.getElementById('menu').style.display='flex';
   hctx.clearRect(0,0,hcv.width,hcv.height);
   G.over=false;
+  G_hero=null;G_enemyHero=null;G_kills=0;
+  const kd=document.getElementById('kill-count');if(kd)kd.textContent='⚔ 0';
+  updateHeroUI();
   selRace=null;
   document.getElementById('startBtn').disabled=true;
   document.querySelectorAll('.rcard').forEach(c=>c.classList.remove('sel'));
@@ -1817,12 +2153,16 @@ function loop(t){
   updateCam(dt);
   updateMines(dt);
   updateUnits(dt);
+  separateUnits();
   updateProjs(dt);
+  updateParticles(dt);
   updateQueues(dt);
   updateEnemyEconomy(dt);
   G.waveT+=dt;
   if(G.waveT>=G.waveInt)spawnWave();
-  G.uiT+=dt;if(G.uiT>0.4){G.uiT=0;updateBuildUI();}
+  G.uiT+=dt;if(G.uiT>0.4){G.uiT=0;updateBuildUI();updateHeroUI();}
+  if(G_hero&&G_hero.alive&&G_hero.abilityT>0)G_hero.abilityT=Math.max(0,G_hero.abilityT-dt);
+  if(G_enemyHero&&G_enemyHero.alive&&G_enemyHero.abilityT>0)G_enemyHero.abilityT=Math.max(0,G_enemyHero.abilityT-dt);
   updateHUD();
   drawHUD(dt);
   drawMinimap();
