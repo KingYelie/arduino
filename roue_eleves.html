@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roue des Élèves</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #0E1116;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased; color: #E8ECF2; }
+    ::selection { background: #EAB44E; color: #0E1116; }
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-thumb { background: #2A323D; border-radius: 9px; border: 2px solid #0E1116; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    @keyframes rdFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    button, input { font-family: inherit; }
+    button { cursor: pointer; }
+    #app { height: 100vh; min-height: 640px; display: flex; flex-direction: column;
+      background: radial-gradient(1100px 700px at 50% -120px, #16202B 0%, #0E1116 60%);
+      overflow: hidden; }
+    header { display: flex; align-items: center; justify-content: space-between;
+      padding: 15px 28px; border-bottom: 1px solid #1B212A;
+      background: rgba(17,21,27,.6); flex-shrink: 0; }
+    main { flex: 1; display: flex; gap: 16px; padding: 18px; min-height: 0; overflow: hidden; }
+    .panel { flex-shrink: 0; background: #13171E; border: 1px solid #1F2630;
+      border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 18px; overflow: auto; }
+    .panel-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px;
+      letter-spacing: .14em; color: #5E6775; font-weight: 600; margin-bottom: 11px; }
+    .stat-card { background: #181D25; border: 1px solid #242C36; border-radius: 10px;
+      padding: 11px 8px; text-align: center; }
+    .stat-val { font-family: 'IBM Plex Mono', monospace; font-size: 21px;
+      font-weight: 600; line-height: 1; }
+    .stat-lbl { font-size: 10.5px; color: #6B7480; margin-top: 6px; }
+    .mode-btn { display: flex; align-items: center; justify-content: space-between;
+      width: 100%; text-align: left; padding: 11px 13px; border-radius: 10px;
+      font-size: 13.5px; font-weight: 500; border: none; transition: filter .15s; }
+    .mode-btn:hover { filter: brightness(1.08); }
+    .mode-active { background: linear-gradient(145deg,#F2C964,#D99B33); color: #1A1206;
+      border: 1px solid #EAB44E !important;
+      box-shadow: 0 5px 16px -6px rgba(234,180,78,.5); }
+    .mode-idle { background: #181D25; color: #AEB7C4; border: 1px solid #262E39 !important; }
+    .mode-count-active { font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+      background: rgba(20,16,6,.22); padding: 1px 8px; border-radius: 6px; }
+    .mode-count-idle { font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+      color: #6B7480; background: #10141A; padding: 1px 8px; border-radius: 6px; }
+    .action-btn { display: flex; align-items: center; gap: 9px; padding: 11px 13px;
+      border-radius: 10px; font-size: 13px; font-weight: 500; border: 1px solid transparent;
+      background: transparent; transition: background .15s, border-color .15s, color .15s; }
+    .action-gold { border-color: #3A331F; color: #EAB44E; }
+    .action-gold:hover { background: #1B1709; }
+    .action-muted { background: #181D25; border-color: #262E39; color: #C4CCD6; }
+    .action-muted:hover { background: #1F2632; }
+    .action-danger { border-color: #262E39; color: #8A929E; }
+    .action-danger:hover { border-color: #4A3033; color: #C98B86; }
+    #center { flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px; min-width: 0; }
+    #wheel-wrap { position: relative; width: 480px; height: 480px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    #wheel-glow { position: absolute; inset: -10px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(234,180,78,.10), transparent 65%);
+      filter: blur(8px); pointer-events: none; }
+    #wheel { display: block; position: relative; }
+    #result-area { display: flex; flex-direction: column; align-items: center;
+      gap: 11px; min-height: 88px; justify-content: flex-start; }
+    #result-text { font-size: 15px; font-weight: 500; color: #7C8696;
+      letter-spacing: -.01em; text-align: center; transition: all .2s; }
+    #confirm-btns { display: none; gap: 10px; animation: rdFade .25s ease; }
+    #btn-confirm { padding: 9px 18px; border-radius: 10px; border: none; font-size: 13px;
+      font-weight: 600; background: linear-gradient(145deg,#F2C964,#D99B33); color: #1A1206;
+      box-shadow: 0 6px 16px -8px rgba(234,180,78,.7); }
+    #btn-ignore { padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
+      background: #181D25; border: 1px solid #2A323D; color: #9AA4B2; }
+    #spin-btn { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px;
+      letter-spacing: .05em; padding: 15px 48px; border-radius: 14px; border: none;
+      background: linear-gradient(145deg,#F2C964,#D99B33); color: #1A1206;
+      box-shadow: 0 12px 32px -12px rgba(234,180,78,.7), inset 0 1px 0 rgba(255,230,174,.6);
+      transition: transform .12s, box-shadow .2s; }
+    #spin-btn:hover:not(:disabled) { transform: translateY(-2px); }
+    #spin-btn:disabled { cursor: not-allowed; background: #1C2129; color: #4A525E; box-shadow: none; }
+    .recent-item { display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+      background: #181D25; border: 1px solid #232B35; border-radius: 10px; }
+    .badge { display: inline-flex; align-items: center; justify-content: center;
+      min-width: 32px; height: 22px; padding: 0 6px; border-radius: 6px;
+      font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600;
+      background: #211B0E; color: #EAB44E; border: 1px solid #3A2F12; }
+    .recent-name { flex: 1; font-size: 13px; color: #D6DCE4;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .recent-time { font-size: 11px; color: #5E6775;
+      font-family: 'IBM Plex Mono', monospace; }
+    /* Modals */
+    .modal-overlay { display: none; position: fixed; inset: 0; z-index: 50;
+      background: rgba(7,9,13,.72); backdrop-filter: blur(3px);
+      align-items: center; justify-content: center; padding: 24px;
+      animation: rdFade .2s ease; }
+    .modal-box { max-width: 100%; max-height: 90vh; display: flex; flex-direction: column;
+      background: #13171E; border: 1px solid #2A323D; border-radius: 18px;
+      box-shadow: 0 40px 80px -30px rgba(0,0,0,.8); overflow: hidden; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 22px; border-bottom: 1px solid #1F2630; }
+    .modal-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; }
+    .modal-close { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2A323D;
+      background: #181D25; color: #9AA4B2; font-size: 15px; line-height: 1; }
+    .tab-btn { padding: 9px 16px; border-radius: 9px 9px 0 0; font-size: 13px; font-weight: 500;
+      border: 1px solid transparent; border-bottom: none; }
+    .tab-active { background: #181D25; color: #EAB44E; border-color: #2A323D; }
+    .tab-idle { background: transparent; color: #7C8696; }
+    .manage-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      background: #181D25; border: 1px solid #242C36; border-radius: 10px; }
+    .manage-row-name { flex: 1; font-size: 14px; color: #E8ECF2; }
+    .manage-row-btn { padding: 5px 11px; border-radius: 7px; border: 1px solid #2A323D;
+      background: transparent; color: #9AA4B2; font-size: 12px; transition: color .12s, border-color .12s; }
+    .manage-row-btn:hover { color: #EAB44E; border-color: #3A331F; }
+    .manage-row-btn.del:hover { color: #C98B86; border-color: #4A3033; }
+    .hist-row { display: flex; align-items: center; gap: 12px; padding: 10px 13px;
+      background: #181D25; border: 1px solid #232B35; border-radius: 10px; font-size: 13px; }
+    .hist-when { font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+      color: #6B7480; min-width: 88px; }
+    .hist-name { flex: 1; color: #E8ECF2; }
+    .hist-group { font-size: 11.5px; color: #9AA4B2; padding: 2px 9px; border-radius: 6px;
+      background: #211B0E; border: 1px solid #3A2F12; }
+    .add-bar { display: flex; gap: 9px; padding: 16px 22px;
+      border-top: 1px solid #1F2630; background: #10141A; }
+    #add-input { flex: 1; padding: 11px 13px; border-radius: 10px; border: 1px solid #2A323D;
+      background: #181D25; color: #E8ECF2; font-size: 13.5px; outline: none; }
+    #add-input:focus { border-color: #EAB44E; }
+    #add-input::placeholder { color: #4A525E; }
+    #btn-add { padding: 11px 20px; border-radius: 10px; border: none; font-size: 13.5px;
+      font-weight: 600; background: linear-gradient(145deg,#F2C964,#D99B33);
+      color: #1A1206; white-space: nowrap; }
+    .empty-msg { text-align: center; color: #4A525E; font-size: 13px; padding: 30px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(150deg,#F2C964,#C8902F);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(255,255,255,.10),0 8px 18px -8px rgba(234,180,78,.55);">
+        <div style="width:15px;height:15px;border:2.5px solid #14100A;border-radius:50%;"></div>
+      </div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;line-height:1;">Roue des Élèves</div>
+        <div id="subtitle" style="font-size:12px;color:#7C8696;margin-top:4px;letter-spacing:.01em;">Sélecteur aléatoire</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#9AA4B2;padding:7px 13px;border:1px solid #2A323D;border-radius:999px;background:#13171E;white-space:nowrap;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#EAB44E;box-shadow:0 0 9px #EAB44E;flex-shrink:0;"></span>
+      Créé par&nbsp;<strong style="color:#EAB44E;font-weight:600;font-family:'Space Grotesk',sans-serif;">Élie</strong>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- LEFT -->
+    <aside class="panel" style="width:250px;">
+      <section>
+        <div class="panel-title">MODE</div>
+        <div id="mode-buttons" style="display:flex;flex-direction:column;gap:7px;"></div>
+      </section>
+
+      <section>
+        <div class="panel-title">STATISTIQUES</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="stat-card">
+            <div id="stat-total" class="stat-val" style="color:#E8ECF2;">0</div>
+            <div class="stat-lbl">Total</div>
+          </div>
+          <div class="stat-card">
+            <div id="stat-passed" class="stat-val" style="color:#EAB44E;">0</div>
+            <div class="stat-lbl">Passés</div>
+          </div>
+          <div class="stat-card">
+            <div id="stat-remaining" class="stat-val" style="color:#C4CCD6;">0</div>
+            <div class="stat-lbl">Restants</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#6B7480;margin-bottom:6px;">
+            <span id="stat-mode-name">Classe entière</span>
+            <span id="stat-pct">0% passés</span>
+          </div>
+          <div style="height:8px;border-radius:999px;background:#1C2129;overflow:hidden;border:1px solid #242C36;">
+            <div id="progress-bar" style="height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#D99B33,#F2C964);transition:width .4s ease;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section style="margin-top:auto;display:flex;flex-direction:column;gap:8px;">
+        <button class="action-btn action-gold" onclick="openManage()">
+          <span style="font-size:14px;line-height:1;">✦</span> Gérer les élèves
+        </button>
+        <button class="action-btn action-muted" onclick="openHistory()">
+          <span style="font-size:14px;line-height:1;">≡</span> Voir l'historique
+        </button>
+        <button class="action-btn action-danger" onclick="resetHistory()">
+          <span style="font-size:14px;line-height:1;">↺</span> Réinitialiser l'historique
+        </button>
+      </section>
+    </aside>
+
+    <!-- CENTER -->
+    <div id="center">
+      <div id="wheel-wrap">
+        <div id="wheel-glow"></div>
+        <canvas id="wheel"></canvas>
+      </div>
+
+      <div id="result-area">
+        <div id="result-text">Appuyez sur Tourner pour choisir un élève</div>
+        <div id="confirm-btns">
+          <button id="btn-confirm" onclick="confirmPassage()">✓ Noter le passage</button>
+          <button id="btn-ignore" onclick="ignorePassage()">Ignorer</button>
+        </div>
+      </div>
+
+      <button id="spin-btn" onclick="spin()">TOURNER</button>
+    </div>
+
+    <!-- RIGHT -->
+    <aside class="panel" style="width:244px;gap:12px;">
+      <div class="panel-title" style="margin-bottom:0;">DERNIERS PASSAGES</div>
+      <div id="recent-list" style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:7px;min-height:0;"></div>
+    </aside>
+
+  </main>
+
+  <!-- MANAGE MODAL -->
+  <div id="manage-modal" class="modal-overlay" onclick="handleOverlayClick(event,'manage-modal')">
+    <div class="modal-box" style="width:560px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">Gérer les élèves</div>
+        <button class="modal-close" onclick="closeManage()">✕</button>
+      </div>
+      <div style="display:flex;gap:7px;padding:16px 22px 0;">
+        <button id="tab-g1" class="tab-btn tab-active" onclick="setManageTab('demi_groupe_1')">Demi-groupe 1</button>
+        <button id="tab-g2" class="tab-btn tab-idle"   onclick="setManageTab('demi_groupe_2')">Demi-groupe 2</button>
+      </div>
+      <div id="manage-count" style="padding:12px 22px 0;font-size:12px;color:#6B7480;"></div>
+      <div id="manage-list" style="flex:1;overflow:auto;padding:12px 22px;display:flex;flex-direction:column;gap:7px;min-height:120px;max-height:340px;"></div>
+      <div class="add-bar">
+        <input id="add-input" placeholder="Un ou plusieurs noms (séparés par des virgules)…" onkeydown="if(event.key==='Enter')addStudents()">
+        <button id="btn-add" onclick="addStudents()">+ Ajouter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY MODAL -->
+  <div id="history-modal" class="modal-overlay" onclick="handleOverlayClick(event,'history-modal')">
+    <div class="modal-box" style="width:600px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">Historique des passages</div>
+        <button class="modal-close" onclick="closeHistory()">✕</button>
+      </div>
+      <div id="history-list" style="flex:1;overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:6px;min-height:140px;max-height:480px;"></div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────
+const SIZE = 480;
+const RAMP = ["#F2CE7E","#B27A2E","#E6AE4C","#8A5C22","#EFDCAB","#C68C38","#D99B3A","#A8702A"];
+const LSKEY_S = "roue_eleves_students_v1";
+const LSKEY_H = "roue_eleves_history_v1";
+
+// ── Persistence ───────────────────────────────────────────────────────────
+function loadStudents() {
+  try { const r = localStorage.getItem(LSKEY_S); if (r) return JSON.parse(r); } catch {}
+  return { demi_groupe_1: [], demi_groupe_2: [] };
+}
+function loadHistory() {
+  try { const r = localStorage.getItem(LSKEY_H); if (r) return JSON.parse(r); } catch {}
+  return [];
+}
+function saveStudents() {
+  try { localStorage.setItem(LSKEY_S, JSON.stringify(students)); } catch {}
+}
+function saveHistory() {
+  try { localStorage.setItem(LSKEY_H, JSON.stringify(history)); } catch {}
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let students  = loadStudents();
+let history   = loadHistory();
+let mode      = "classe_entiere";
+let spinning  = false;
+let result    = null;      // { name, already }
+let showConfirm = false;
+let manageTab = "demi_groupe_1";
+let rotation  = -Math.PI / 2 + 0.0001;
+let speed     = 0;
+let decel     = 0.985;
+let winnerIdx = null;
+let flashOn   = false;
+let raf       = null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function currentStudents() {
+  const g1 = students.demi_groupe_1 || [], g2 = students.demi_groupe_2 || [];
+  if (mode === "demi_groupe_1") return g1.slice();
+  if (mode === "demi_groupe_2") return g2.slice();
+  return [...g1, ...g2];
+}
+function calledSet()  { return new Set(history.map(e => e.student)); }
+function modeName(m)  {
+  return { classe_entiere: "Classe entière", demi_groupe_1: "Demi-groupe 1",
+           demi_groupe_2: "Demi-groupe 2" }[m || mode] || "";
+}
+function modeAbbr(m)  {
+  return { classe_entiere: "CE", demi_groupe_1: "G1", demi_groupe_2: "G2" }[m] || "?";
+}
+function pad2(n)      { return String(n).padStart(2, "0"); }
+function esc(s)       { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// ── Canvas drawing ────────────────────────────────────────────────────────
+function draw() {
+  const c = document.getElementById("wheel"); if (!c) return;
+  const ctx = c.getContext("2d");
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const S = SIZE;
+  if (c.width !== Math.round(S * dpr)) {
+    c.width = Math.round(S * dpr); c.height = Math.round(S * dpr);
+    c.style.width = S + "px"; c.style.height = S + "px";
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, S, S);
+
+  const cx = S / 2, cy = S / 2, R = cx - 34, HUB = 34;
+  const studs  = currentStudents();
+  const called = calledSet();
+
+  // outer plate
+  ctx.beginPath(); ctx.arc(cx, cy, R + 13, 0, Math.PI * 2);
+  ctx.fillStyle = "#10141A"; ctx.fill();
+  ctx.lineWidth = 1; ctx.strokeStyle = "#283039"; ctx.stroke();
+
+  if (!studs.length) {
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = "#161B22"; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#2A323D"; ctx.stroke();
+    ctx.fillStyle = "#5E6775"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "600 16px 'IBM Plex Sans',sans-serif";
+    ctx.fillText("Aucun élève", cx, cy - 11);
+    ctx.font = "400 12.5px 'IBM Plex Sans',sans-serif"; ctx.fillStyle = "#4A525E";
+    ctx.fillText("Ouvrez « Gérer les élèves »", cx, cy + 13);
+    drawPointer(ctx, cx, cy, R); return;
+  }
+
+  const n = studs.length, sweep = (Math.PI * 2) / n;
+  for (let i = 0; i < n; i++) {
+    const a0 = rotation + i * sweep, a1 = a0 + sweep;
+    const name     = studs[i];
+    const isCalled = called.has(name);
+    const isWin    = winnerIdx === i;
+    const flashing = isWin && flashOn;
+    let fill = isCalled ? "#222831" : RAMP[i % RAMP.length];
+    if (flashing) fill = "#FFD27A"; else if (isWin) fill = "#F4C766";
+
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.lineWidth = isWin ? 3 : 1.25;
+    ctx.strokeStyle = isWin ? "#FFE6AE" : "#10141A"; ctx.stroke();
+
+    const mid  = a0 + sweep / 2;
+    const dn   = (((mid * 180) / Math.PI) % 360 + 360) % 360;
+    const flip = dn > 90 && dn < 270;
+    const maxc = Math.max(6, Math.floor(15 - n / 4));
+    const lbl  = name.length <= maxc ? name : name.slice(0, maxc - 1) + "…";
+    const fsz  = Math.max(9, Math.min(15, Math.round(210 / n) + 4));
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(mid);
+    ctx.textBaseline = "middle";
+    ctx.font = "600 " + fsz + "px 'IBM Plex Sans',sans-serif";
+    ctx.fillStyle = isCalled ? "#5A636F" : "#241906";
+    if (flip) { ctx.rotate(Math.PI); ctx.textAlign = "left"; ctx.fillText(lbl, -(R - 16), 0); }
+    else      { ctx.textAlign = "right"; ctx.fillText(lbl, R - 16, 0); }
+    ctx.restore();
+  }
+
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.lineWidth = 3; ctx.strokeStyle = "#0E1116"; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R - 1.5, 0, Math.PI * 2);
+  ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.stroke();
+
+  ctx.beginPath(); ctx.arc(cx, cy, HUB, 0, Math.PI * 2);
+  ctx.fillStyle = "#11151B"; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = "#2A323D"; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, HUB - 8, 0, Math.PI * 2);
+  ctx.fillStyle = "#161B22"; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "#EAB44E"; ctx.fill();
+  ctx.lineWidth = 1; ctx.strokeStyle = "#FFE6AE"; ctx.stroke();
+
+  drawPointer(ctx, cx, cy, R);
+}
+
+function drawPointer(ctx, cx, cy, R) {
+  const topY = cy - R;
+  ctx.save();
+  ctx.shadowColor = "rgba(234,180,78,0.55)"; ctx.shadowBlur = 14;
+  ctx.beginPath();
+  ctx.moveTo(cx - 14, topY - 19); ctx.lineTo(cx + 14, topY - 19); ctx.lineTo(cx, topY + 11);
+  ctx.closePath(); ctx.fillStyle = "#EAB44E"; ctx.fill();
+  ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.strokeStyle = "#FFE6AE"; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, topY - 19, 11, 0, Math.PI * 2);
+  ctx.fillStyle = "#EAB44E"; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = "#FFE6AE"; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, topY - 19, 4, 0, Math.PI * 2);
+  ctx.fillStyle = "#11151B"; ctx.fill();
+  ctx.restore();
+}
+
+function topSector() {
+  const n = currentStudents().length; if (!n) return 0;
+  const sweep = (Math.PI * 2) / n;
+  let rel = (-Math.PI / 2 - rotation) % (Math.PI * 2);
+  if (rel < 0) rel += Math.PI * 2;
+  return Math.floor(rel / sweep) % n;
+}
+
+// ── Spin ──────────────────────────────────────────────────────────────────
+function spin() {
+  if (spinning) return;
+  const studs = currentStudents();
+  if (!studs.length) {
+    alert("Aucun élève dans ce groupe !\nOuvrez « Gérer les élèves » pour en ajouter.");
+    return;
+  }
+  winnerIdx = null; flashOn = false; spinning = true;
+  result = null; showConfirm = false;
+  updateUI();
+  speed = 0.40 + Math.random() * 0.10;
+  loop();
+}
+function loop() {
+  rotation += speed; speed *= decel; draw();
+  if (speed > 0.003) { raf = requestAnimationFrame(loop); }
+  else { rotation %= Math.PI * 2; onStop(); }
+}
+function onStop() {
+  winnerIdx = topSector();
+  flashAnim(0);
+}
+function flashAnim(count) {
+  flashOn = !flashOn; draw();
+  if (count < 7) setTimeout(() => flashAnim(count + 1), 115);
+  else {
+    flashOn = true; draw();
+    const winner  = currentStudents()[winnerIdx];
+    const already = calledSet().has(winner);
+    spinning = false;
+    result   = { name: winner, already };
+    showConfirm = !already;
+    updateUI();
+  }
+}
+function confirmPassage() {
+  if (!result) return;
+  const d    = new Date();
+  const when = pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + " · " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  history.push({ student: result.name, mode, when, time: pad2(d.getHours()) + ":" + pad2(d.getMinutes()) });
+  saveHistory();
+  winnerIdx = null; result = null; showConfirm = false;
+  draw(); updateUI();
+}
+function ignorePassage() {
+  winnerIdx = null; result = null; showConfirm = false;
+  draw(); updateUI();
+}
+
+// ── Mode ──────────────────────────────────────────────────────────────────
+function setMode(m) {
+  if (spinning) return;
+  winnerIdx = null; mode = m; result = null; showConfirm = false;
+  draw(); updateUI();
+}
+
+// ── UI update ─────────────────────────────────────────────────────────────
+function updateUI() {
+  const studs    = currentStudents();
+  const called   = calledSet();
+  const total    = studs.length;
+  const passed   = studs.filter(s => called.has(s)).length;
+  const remaining = total - passed;
+  const pct      = total ? Math.round((passed / total) * 100) : 0;
+
+  document.getElementById("stat-total").textContent     = total;
+  document.getElementById("stat-passed").textContent    = passed;
+  document.getElementById("stat-remaining").textContent = remaining;
+  document.getElementById("stat-mode-name").textContent = modeName();
+  document.getElementById("stat-pct").textContent       = pct + "% passés";
+  document.getElementById("progress-bar").style.width   = pct + "%";
+
+  const g1 = students.demi_groupe_1 || [], g2 = students.demi_groupe_2 || [];
+  document.getElementById("mode-buttons").innerHTML = [
+    { lbl: "Classe entière", val: "classe_entiere", count: g1.length + g2.length },
+    { lbl: "Demi-groupe 1",  val: "demi_groupe_1",  count: g1.length },
+    { lbl: "Demi-groupe 2",  val: "demi_groupe_2",  count: g2.length },
+  ].map(({lbl, val, count}) => {
+    const active = mode === val;
+    return `<button class="mode-btn ${active ? "mode-active" : "mode-idle"}" onclick="setMode('${val}')">
+      <span>${lbl}</span>
+      <span class="${active ? "mode-count-active" : "mode-count-idle"}">${count}</span>
+    </button>`;
+  }).join("");
+
+  const rt = document.getElementById("result-text");
+  const cb = document.getElementById("confirm-btns");
+  if (spinning) {
+    rt.style.fontFamily = "'IBM Plex Sans',sans-serif"; rt.style.fontWeight = "500";
+    rt.style.fontSize = "15px"; rt.style.color = "#EAB44E";
+    rt.textContent = "Tirage en cours…"; cb.style.display = "none";
+  } else if (result) {
+    if (result.already) {
+      rt.style.fontFamily = "'IBM Plex Sans',sans-serif"; rt.style.fontWeight = "500";
+      rt.style.fontSize = "15px"; rt.style.color = "#9AA4B2";
+      rt.textContent = result.name + " · déjà passé·e au tableau";
+    } else {
+      rt.style.fontFamily = "'Space Grotesk',sans-serif"; rt.style.fontWeight = "700";
+      rt.style.fontSize = "22px"; rt.style.color = "#F2C964";
+      rt.textContent = "★  " + result.name + "  passe au tableau";
+    }
+    cb.style.display = showConfirm ? "flex" : "none";
+  } else {
+    rt.style.fontFamily = "'IBM Plex Sans',sans-serif"; rt.style.fontWeight = "500";
+    rt.style.fontSize = "15px"; rt.style.color = "#7C8696";
+    rt.textContent = "Appuyez sur Tourner pour choisir un élève";
+    cb.style.display = "none";
+  }
+
+  const sb = document.getElementById("spin-btn");
+  sb.disabled = spinning || total === 0;
+  sb.textContent = spinning ? "…" : "TOURNER";
+
+  const rl = document.getElementById("recent-list");
+  const recent = history.slice(-14).reverse();
+  rl.innerHTML = recent.length
+    ? recent.map(e => `<div class="recent-item">
+        <span class="badge">${esc(modeAbbr(e.mode))}</span>
+        <span class="recent-name">${esc(e.student)}</span>
+        <span class="recent-time">${esc(e.time || "")}</span>
+      </div>`).join("")
+    : `<div class="empty-msg">Aucun passage<br>pour l'instant</div>`;
+}
+
+// ── Manage modal ──────────────────────────────────────────────────────────
+function openManage() {
+  renderManageList();
+  document.getElementById("manage-modal").style.display = "flex";
+  setTimeout(() => document.getElementById("add-input").focus(), 80);
+}
+function closeManage() {
+  document.getElementById("manage-modal").style.display = "none";
+  draw(); updateUI();
+}
+function setManageTab(tab) {
+  manageTab = tab;
+  document.getElementById("tab-g1").className = "tab-btn " + (manageTab === "demi_groupe_1" ? "tab-active" : "tab-idle");
+  document.getElementById("tab-g2").className = "tab-btn " + (manageTab === "demi_groupe_2" ? "tab-active" : "tab-idle");
+  renderManageList();
+}
+function renderManageList() {
+  const list = students[manageTab] || [];
+  document.getElementById("manage-count").textContent = list.length + " élève" + (list.length !== 1 ? "s" : "");
+  const ml = document.getElementById("manage-list");
+  ml.innerHTML = list.length
+    ? list.map((name, idx) => `<div class="manage-row">
+        <span class="manage-row-name">${esc(name)}</span>
+        <button class="manage-row-btn" onclick="renameStudent(${idx})">Renommer</button>
+        <button class="manage-row-btn del" onclick="removeStudent(${idx})">Supprimer</button>
+      </div>`).join("")
+    : `<div class="empty-msg">Aucun élève dans ce groupe</div>`;
+}
+function addStudents() {
+  const inp  = document.getElementById("add-input");
+  const raw  = inp.value || "";
+  const names = raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+  if (!names.length) return;
+  const list = students[manageTab] || (students[manageTab] = []);
+  const existing = new Set(list);
+  names.forEach(nm => { if (!existing.has(nm)) { list.push(nm); existing.add(nm); } });
+  saveStudents(); inp.value = "";
+  renderManageList(); draw(); updateUI();
+}
+function renameStudent(idx) {
+  const list = students[manageTab] || [];
+  const old  = list[idx];
+  const nv   = prompt("Nouveau nom pour « " + old + " » :", old);
+  if (nv && nv.trim() && nv.trim() !== old) {
+    list[idx] = nv.trim(); saveStudents(); renderManageList(); draw(); updateUI();
+  }
+}
+function removeStudent(idx) {
+  const list = students[manageTab] || [];
+  if (confirm("Supprimer « " + list[idx] + " » ?")) {
+    list.splice(idx, 1); saveStudents(); renderManageList(); draw(); updateUI();
+  }
+}
+
+// ── History modal ─────────────────────────────────────────────────────────
+function openHistory() {
+  const hl = document.getElementById("history-list");
+  hl.innerHTML = history.length
+    ? history.slice().reverse().map(e => `<div class="hist-row">
+        <span class="hist-when">${esc(e.when || "")}</span>
+        <span class="hist-name">${esc(e.student)}</span>
+        <span class="hist-group">${esc(modeName(e.mode))}</span>
+      </div>`).join("")
+    : `<div class="empty-msg">Aucun passage enregistré</div>`;
+  document.getElementById("history-modal").style.display = "flex";
+}
+function closeHistory() {
+  document.getElementById("history-modal").style.display = "none";
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────
+function resetHistory() {
+  if (!confirm("Effacer l'historique pour : " + modeName() + " ?")) return;
+  if (mode === "classe_entiere") { history = []; }
+  else { const grp = new Set(students[mode] || []); history = history.filter(e => !grp.has(e.student)); }
+  saveHistory(); draw(); updateUI();
+}
+
+// ── Overlay click ─────────────────────────────────────────────────────────
+function handleOverlayClick(e, id) {
+  if (e.target === document.getElementById(id)) {
+    document.getElementById(id).style.display = "none";
+    if (id === "manage-modal") { draw(); updateUI(); }
+  }
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeManage(); closeHistory();
+  }
+  if (e.key === " " && e.target.tagName !== "INPUT" && e.target.tagName !== "BUTTON") {
+    e.preventDefault(); spin();
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+draw();
+updateUI();
+</script>
+</body>
+</html>
