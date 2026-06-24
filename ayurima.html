@@ -1000,54 +1000,126 @@ function mkBldMesh(bd, raceId){
 }
 
 // ── BASE MESH FACTORY ─────────────────────────────────────────────────────
+const BASE_PAL={
+  nexus :{armor:0x9c7d3e,armorEm:0x2a2008,trim:0xe4c275,dark:0x191722,darkEm:0x080812,gem:0x3b82f6,gemHot:0x9ec5ff,beam:0x6aa8ff},
+  vide  :{armor:0x6f3b2b,armorEm:0x250f07,trim:0x9a5238,dark:0x160a09,darkEm:0x070303,gem:0xef4444,gemHot:0xff9d8c,beam:0xff5a44},
+  cristal:{armor:0x69868f,armorEm:0x16242a,trim:0xb4d6de,dark:0x0c2128,darkEm:0x051218,gem:0x22d3ee,gemHot:0xb4f4ff,beam:0x53e6ff},
+  synth :{armor:0x5e5034,armorEm:0x1c160b,trim:0xb08c4e,dark:0x161208,darkEm:0x080603,gem:0xf59e0b,gemHot:0xffd584,beam:0xffba4a}
+};
+
 function mkBaseMesh(raceId, team){
   const g=new THREE.Group();
-  const rd=RACES[raceId];
-  const col=new THREE.Color(team===1?rd.color:'#ef4444');
-  const eCol=col.clone().multiplyScalar(0.22);
-  const mat=(c,e)=>new THREE.MeshPhongMaterial({color:c||col,emissive:e||eCol,shininess:55});
+  const P=Object.assign({},BASE_PAL[raceId]||BASE_PAL.nexus);
+  if(team===2){P.gem=0xef4444;P.gemHot=0xff9d8c;P.beam=0xff5a44;P.armor=0x5a3b30;P.trim=0x8a5040;}
 
-  const platform=mesh(new THREE.CylinderGeometry(3.4,3.9,0.48,8),mat());g.add(platform);
+  const metal=(c,e,sh)=>new THREE.MeshPhongMaterial({color:c,emissive:e==null?0x000000:e,shininess:sh==null?58:sh,specular:0x6b5a3a});
+  const xtal =(c,e,o)=>new THREE.MeshPhongMaterial({color:c,emissive:e,shininess:120,transparent:true,opacity:o==null?0.85:o,specular:0xffffff});
+  const glow =(c,o)=>new THREE.MeshBasicMaterial({color:c,transparent:o!=null,opacity:o==null?1:o});
+  const orb  =(r,c)=>mesh(new THREE.SphereGeometry(r,12,12),glow(c));
+  function gemNode(r,gemCol,hotCol){
+    const n=new THREE.Group();
+    const sock=mesh(new THREE.CylinderGeometry(r*1.5,r*1.7,r*0.6,8),metal(0x09090f,0x000000,10));n.add(sock);
+    const lens=mesh(new THREE.SphereGeometry(r,12,12),glow(gemCol));lens.position.y=r*0.45;n.add(lens);
+    const core=mesh(new THREE.SphereGeometry(r*0.5,10,10),glow(hotCol));core.position.y=r*0.55;n.add(core);
+    return n;
+  }
+  function beam(color,height,radius){
+    const b=new THREE.Group();
+    const outer=mesh(new THREE.CylinderGeometry(radius*1.15,radius*0.4,height,14,1,true),
+      new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.10,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false}));
+    outer.position.y=height/2;b.add(outer);addSpin(outer,0.6);addPulse(outer.material,0.05,0.15,2.2);
+    const mid=mesh(new THREE.CylinderGeometry(radius*0.7,radius*0.26,height,12,1,true),
+      new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.30,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false}));
+    mid.position.y=height/2;b.add(mid);addSpin(mid,-0.9);
+    const core=mesh(new THREE.CylinderGeometry(radius*0.28,radius*0.1,height,10,1,true),
+      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));
+    core.position.y=height/2;b.add(core);addPulse(core.material,0.35,0.65,3.1);
+    const ring=mesh(new THREE.RingGeometry(radius*0.3,radius*1.5,24),
+      new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false}));
+    ring.rotation.x=-PI/2;ring.position.y=0.06;b.add(ring);addPulse(ring.material,0.2,0.5,2.6);
+    return b;
+  }
 
-  if(raceId==='nexus'||team===2){
-    const body=mesh(new THREE.BoxGeometry(3.8,2.8,3.8),mat());body.position.y=1.68;g.add(body);
-    for(const cx of[-1,1])for(const cz of[-1,1]){
-      const t=mesh(new THREE.CylinderGeometry(0.48,0.58,3.8,6),mat());
-      t.position.set(cx*1.95,2,cz*1.95);g.add(t);
-      const cap=mesh(new THREE.CylinderGeometry(0.58,0.58,0.38,6),mat());
-      cap.position.set(cx*1.95,3.9,cz*1.95);g.add(cap);
-    }
-    const spire=mesh(new THREE.ConeGeometry(0.55,3.8,6),mat());spire.position.y=5.2;g.add(spire);
-    const gem=mesh(new THREE.OctahedronGeometry(0.4),mat(0xc4b5fd,0x7c3aed));gem.position.y=7.2;g.add(gem);
+  // shared foundation plate
+  const plate=mesh(new THREE.CylinderGeometry(3.5,4.0,0.5,8),metal(P.dark,P.darkEm,30));
+  plate.position.y=0.25;plate.rotation.y=PI/8;g.add(plate);
+  const plateTrim=mesh(new THREE.TorusGeometry(3.6,0.1,8,8),metal(P.trim,P.armorEm,110));
+  plateTrim.rotation.x=PI/2;plateTrim.position.y=0.5;plateTrim.rotation.z=PI/8;g.add(plateTrim);
+  for(let i=0;i<4;i++){const a=i/4*PI*2+PI/4;const gm=gemNode(0.16,P.gem,P.gemHot);gm.position.set(Math.cos(a)*3.5,0.5,Math.sin(a)*3.5);g.add(gm);}
 
-  } else if(raceId==='vide'){
-    const hive=mesh(new THREE.SphereGeometry(2.1,12,10),mat());hive.position.y=2.4;g.add(hive);
+  if(raceId==='nexus'){
+    const d1=mesh(new THREE.CylinderGeometry(2.7,3.1,0.7,8),metal(P.armor,P.armorEm));d1.position.y=0.8;d1.rotation.y=PI/8;g.add(d1);
+    const d2=mesh(new THREE.CylinderGeometry(2.0,2.55,0.85,8),metal(P.armor,P.armorEm));d2.position.y=1.55;d2.rotation.y=PI/8;g.add(d2);
+    const ringTrim=mesh(new THREE.TorusGeometry(2.25,0.12,8,32),metal(P.trim,P.armorEm,120));ringTrim.rotation.x=PI/2;ringTrim.position.y=1.9;g.add(ringTrim);
+    const core=mesh(new THREE.CylinderGeometry(1.25,1.55,2.7,6),metal(P.dark,P.darkEm,26));core.position.y=3.15;core.rotation.y=PI/6;g.add(core);
+    const cap=mesh(new THREE.CylinderGeometry(0.85,1.3,0.65,6),metal(P.armor,P.armorEm));cap.position.y=4.7;cap.rotation.y=PI/6;g.add(cap);
+    const emSock=mesh(new THREE.CylinderGeometry(0.72,0.72,0.18,20),metal(0x07080d,0x000000,10));emSock.rotation.x=PI/2;emSock.position.set(0,3.1,1.5);g.add(emSock);
+    const emRing=mesh(new THREE.TorusGeometry(0.52,0.06,8,24),glow(P.gem));emRing.position.set(0,3.1,1.58);g.add(emRing);
+    const emCore=mesh(new THREE.CircleGeometry(0.42,24),glow(P.gemHot));emCore.position.set(0,3.1,1.57);emCore.material.transparent=true;g.add(emCore);addPulse(emCore.material,0.6,1.0,2.4);
     for(let i=0;i<6;i++){
-      const a=i/6*Math.PI*2;
-      const t=mesh(new THREE.CylinderGeometry(0.14,0.28,2.8,5),mat());
-      t.position.set(Math.cos(a)*1.7,1.0,Math.sin(a)*1.7);
-      t.rotation.z=Math.sin(a)*0.38;t.rotation.x=Math.cos(a)*0.38;g.add(t);
+      const a=i/6*PI*2;
+      const arm=new THREE.Group();arm.rotation.y=a;g.add(arm);
+      const claw=mesh(new THREE.TorusGeometry(2.0,0.15,8,24,PI*0.6),metal(P.armor,P.armorEm,95));
+      claw.position.set(0,3.0,0);claw.rotation.z=-1.2;claw.scale.set(1,1,2.4);arm.add(claw);
+      const tipFin=mesh(new THREE.ConeGeometry(0.2,0.7,4),metal(P.trim,P.armorEm,120));
+      tipFin.position.set(1.55,4.5,0);tipFin.rotation.z=-0.35;tipFin.scale.set(0.55,1,1.5);arm.add(tipFin);
+      const gem=mesh(new THREE.SphereGeometry(0.28,14,12),glow(P.gem));gem.scale.set(0.32,1.25,0.9);gem.position.set(2.02,2.45,0);arm.add(gem);
+      const gemHot=mesh(new THREE.SphereGeometry(0.12,10,10),glow(P.gemHot));gemHot.position.set(1.88,2.45,0);gemHot.material.transparent=true;arm.add(gemHot);addPulse(gemHot.material,0.5,1.0,rr(1.6,2.6),rr(0,6));
     }
+    const spire=mesh(new THREE.ConeGeometry(0.38,1.5,6),metal(P.trim,P.armorEm,120));spire.position.y=5.7;g.add(spire);
+    const topGem=gemNode(0.24,P.gem,P.gemHot);topGem.position.y=6.5;g.add(topGem);
+    g.add((()=>{const b=beam(P.beam,5.2,0.46);b.position.y=6.7;return b;})());
+    const piv=new THREE.Group();piv.position.y=3.4;g.add(piv);const sh=mesh(new THREE.OctahedronGeometry(0.2),glow(P.gemHot));sh.position.x=2.9;piv.add(sh);addSpin(piv,0.8);
 
-  } else if(raceId==='cristal'){
-    const ring2=mesh(new THREE.CylinderGeometry(2.4,2.9,0.95,6),mat());ring2.position.y=0.48;g.add(ring2);
-    for(let i=0;i<6;i++){
-      const a=i/6*Math.PI*2;
-      const h=i%2===0?5.5:3.8;
-      const r=i%2===0?1.9:0.6;
-      const sp=mesh(new THREE.ConeGeometry(i%2===0?0.38:0.24,h,6),
-        new THREE.MeshPhongMaterial({color:col,emissive:0x0891b2,shininess:110,transparent:true,opacity:0.87}));
-      sp.position.set(Math.cos(a)*r,h/2+0.95,Math.sin(a)*r);g.add(sp);
+  }else if(raceId==='vide'){
+    const core=mesh(new THREE.IcosahedronGeometry(2.0,1),metal(P.dark,P.darkEm,18));core.position.y=2.5;core.scale.set(1,1.12,1);g.add(core);
+    const shell=mesh(new THREE.SphereGeometry(2.15,12,10),metal(P.armor,P.armorEm,40));shell.position.y=2.5;shell.scale.set(1,1.1,1);shell.material.transparent=true;shell.material.opacity=0.5;g.add(shell);
+    const eyeSock=mesh(new THREE.SphereGeometry(0.72,14,14),metal(0x07050a,0,10));eyeSock.position.set(0,2.8,1.7);g.add(eyeSock);
+    const eye=orb(0.5,P.gem);eye.position.set(0,2.8,1.95);g.add(eye);
+    const eyeHot=orb(0.24,P.gemHot);eyeHot.position.set(0,2.8,2.25);eyeHot.material.transparent=true;g.add(eyeHot);addPulse(eyeHot.material,0.55,1.0,1.8);
+    for(let i=0;i<7;i++){
+      const a=i/7*PI*2;
+      const arm=new THREE.Group();arm.rotation.y=a;g.add(arm);
+      const rib=mesh(new THREE.TorusGeometry(2.3,0.16,7,22,PI*0.78),metal(P.armor,P.armorEm,55));
+      rib.position.set(0,2.5,0);rib.rotation.z=-0.55;arm.add(rib);
+      const claw=mesh(new THREE.ConeGeometry(0.18,1.25,5),metal(0x3a1810,0x140604,40));
+      claw.position.set(0.55,4.7,0);claw.rotation.z=0.18;arm.add(claw);
+      if(i%2===0){const p=orb(0.26,P.gem);p.position.set(2.0,2.3,0.3);p.material.transparent=true;arm.add(p);addPulse(p.material,0.5,1.0,rr(1.4,2.4),rr(0,6));}
     }
+    g.add((()=>{const b=beam(P.beam,5.6,0.44);b.position.y=4.7;return b;})());
 
-  } else {
-    // synth
-    const slab=mesh(new THREE.BoxGeometry(4.8,0.75,4.8),mat());slab.position.y=0.38;g.add(slab);
-    const pillar=mesh(new THREE.CylinderGeometry(1.15,1.52,4.8,8),mat());pillar.position.y=3.2;g.add(pillar);
-    const torus=mesh(new THREE.TorusGeometry(1.9,0.14,6,16),mat(0xfbbf24,0xd97706));
-    torus.position.y=5.5;torus.rotation.x=Math.PI/2;g.add(torus);
-    const antenna=mesh(new THREE.CylinderGeometry(0.08,0.08,2,4),mat(0xfbbf24,0xd97706));
-    antenna.position.y=6.9;g.add(antenna);
+  }else if(raceId==='cristal'){
+    const s1=mesh(new THREE.CylinderGeometry(2.6,3.0,0.6,6),metal(P.armor,P.armorEm,80));s1.position.y=0.7;g.add(s1);
+    const s2=mesh(new THREE.CylinderGeometry(2.0,2.4,0.55,6),metal(P.armor,P.armorEm,80));s2.position.y=1.25;s2.rotation.y=PI/6;g.add(s2);
+    const ringT=mesh(new THREE.TorusGeometry(2.1,0.1,8,40),metal(P.trim,P.armorEm,120));ringT.rotation.x=PI/2;ringT.position.y=1.5;g.add(ringT);
+    const shardData=[[0,0,5.4,0.58],[0.95,0.3,3.7,0.38],[-0.85,0.55,4.1,0.42],[0.4,-1.0,3.3,0.34],[-0.5,-0.85,4.4,0.4],[1.1,-0.55,2.9,0.3],[-1.15,-0.2,3.1,0.32],[0.25,1.0,3.4,0.34]];
+    for(const[sx,sz,h,r]of shardData){
+      const cr=mesh(new THREE.ConeGeometry(r,h,6),xtal(P.gem,0x0e4a55,0.74));
+      cr.position.set(sx,1.5+h/2,sz);cr.rotation.y=rr(0,PI);cr.rotation.z=sx*0.05;g.add(cr);
+      const inner=mesh(new THREE.ConeGeometry(r*0.4,h*0.82,6),glow(P.gemHot,0.45));inner.position.set(sx,1.5+h/2,sz);inner.rotation.z=sx*0.05;g.add(inner);
+    }
+    const coreG=new THREE.Group();coreG.position.y=2.9;g.add(coreG);
+    const coreGem=mesh(new THREE.OctahedronGeometry(0.78),xtal(P.gemHot,0x0891b2,0.92));coreG.add(coreGem);addSpin(coreGem,0.5);addBob(coreG,0.2,1.4);
+    const coreGlow2=orb(0.36,P.gemHot);coreGlow2.material.transparent=true;coreGlow2.material.opacity=0.5;coreGem.add(coreGlow2);
+    const halo=mesh(new THREE.TorusGeometry(1.25,0.04,8,40),glow(P.gem));halo.rotation.x=PI/2.4;halo.position.y=2.9;g.add(halo);addSpin(halo,-0.6);
+    g.add((()=>{const b=beam(P.beam,5.6,0.42);b.position.y=6.6;return b;})());
+
+  }else{ // synth
+    const slab=mesh(new THREE.BoxGeometry(5.0,0.9,5.0),metal(P.armor,P.armorEm,70));slab.position.y=0.7;g.add(slab);
+    const slab2=mesh(new THREE.BoxGeometry(3.6,0.7,3.6),metal(P.dark,P.darkEm,40));slab2.position.y=1.4;g.add(slab2);
+    const tower=mesh(new THREE.CylinderGeometry(1.35,1.62,2.8,8),metal(P.armor,P.armorEm));tower.position.y=3.0;g.add(tower);
+    for(let i=0;i<8;i++){const a=i/8*PI*2;const slit=mesh(new THREE.BoxGeometry(0.12,1.9,0.06),glow(i%2?P.gemHot:P.gem));slit.position.set(Math.cos(a)*1.44,3.0,Math.sin(a)*1.44);slit.rotation.y=-a;slit.material.transparent=true;g.add(slit);addPulse(slit.material,0.4,1.0,rr(1.6,2.8),rr(0,6));}
+    const reactor=mesh(new THREE.CylinderGeometry(0.72,0.72,0.7,6),glow(P.gemHot));reactor.position.y=4.75;reactor.material.transparent=true;g.add(reactor);addPulse(reactor.material,0.55,1.0,2.2);
+    const towerCap=mesh(new THREE.CylinderGeometry(1.55,1.15,0.55,8),metal(P.trim,P.armorEm,120));towerCap.position.y=4.35;g.add(towerCap);
+    const r1=mesh(new THREE.TorusGeometry(2.1,0.08,8,40),glow(P.gem));r1.rotation.x=PI/2;r1.position.y=2.6;g.add(r1);addSpin(r1,1.0);
+    const r2=mesh(new THREE.TorusGeometry(1.82,0.055,8,40),glow(P.gemHot));r2.rotation.x=PI/2;r2.position.y=3.35;g.add(r2);addSpin(r2,-1.4);
+    for(const[cx,cz]of[[-1,-1],[1,-1],[-1,1],[1,1]]){
+      const ch=mesh(new THREE.CylinderGeometry(0.24,0.32,1.8,6),metal(P.dark,P.darkEm,40));ch.position.set(cx*1.95,2.0,cz*1.95);g.add(ch);
+      const tip=orb(0.13,P.gemHot);tip.position.set(cx*1.95,3.0,cz*1.95);tip.material.transparent=true;g.add(tip);addPulse(tip.material,0.3,1.0,rr(2,4),rr(0,6));
+    }
+    const mast=mesh(new THREE.CylinderGeometry(0.1,0.1,1.3,6),metal(P.trim,P.armorEm,120));mast.position.y=5.35;g.add(mast);
+    const beacon=gemNode(0.24,P.gem,P.gemHot);beacon.position.y=6.0;g.add(beacon);
+    g.add((()=>{const b=beam(P.beam,5.4,0.36);b.position.y=6.1;return b;})());
   }
   return g;
 }
@@ -2390,11 +2462,13 @@ let SPIN_OFF=false;
 const SPINNERS=[];
 function addSpin(obj,spd){if(!SPIN_OFF)SPINNERS.push({obj,spd,type:'spin'});}
 function addBob(obj,amp,freq){if(!SPIN_OFF)SPINNERS.push({obj,amp,freq,type:'bob',base:obj.position.y});}
+function addPulse(mat,lo,hi,freq,ph){if(!SPIN_OFF)SPINNERS.push({mat,lo,hi,freq,ph:ph||0,type:'pulse'});}
 function updateSpinners(dt){
   const t=performance.now()/1000;
   for(const s of SPINNERS){
     if(s.type==='spin')s.obj.rotation.y+=s.spd*dt;
-    else s.obj.position.y=s.base+Math.sin(t*s.freq)*s.amp;
+    else if(s.type==='bob')s.obj.position.y=s.base+Math.sin(t*s.freq)*s.amp;
+    else if(s.type==='pulse'&&s.mat)s.mat.opacity=s.lo+(s.hi-s.lo)*(0.5+0.5*Math.sin(t*s.freq+s.ph));
   }
 }
 
