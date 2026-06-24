@@ -63,8 +63,8 @@ def save_history(history):
 
 class WheelApp:
     W       = 520    # taille du canvas (px)
-    FPS     = 14     # ms par frame
-    DECEL   = 0.972  # décélération par frame
+    FPS     = 14     # ms par frame (~70 fps)
+    DECEL   = 0.975  # décélération par frame (≈6-8 tours)
     FLASH_N = 7      # cycles de flash
 
     def __init__(self, root: tk.Tk):
@@ -445,15 +445,16 @@ class WheelApp:
         self.spin_btn.config(state=tk.DISABLED)
         self.result_var.set("…")
         self.result_lbl.config(fg=TXT_DIM)
-        self.speed = random.uniform(16, 25)
+        # vitesse initiale : ~6-10 tours complets avant arrêt
+        self.speed = random.uniform(55, 85)
         self._animate()
 
     def _animate(self):
         self.angle = (self.angle + self.speed) % 360
         self.speed *= self.DECEL
         self._draw_wheel()
-        if self.speed > 0.20:
-            self.root.after(self.FPS_MS, self._animate)
+        if self.speed > 0.25:
+            self.root.after(self.FPS, self._animate)
         else:
             self.spinning = False
             # spin_btn reste désactivé jusqu'à confirm / ignore
