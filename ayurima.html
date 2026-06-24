@@ -334,6 +334,22 @@ const LORE={
   synth:'Conscience artificielle éveillée dans les ruines d\'une civilisation oubliée, les Synthétiques perfectionnent sans cesse leurs machines de guerre. Précision chirurgicale et puissance de feu écrasante.'
 };
 
+// ── UNIT PASSIVES ────────────────────────────────────────────────────────
+const UNIT_PASSIVE={
+  col:'Collecte +10% essence au contact',kira:'Sprint: +30% vitesse sous 40% HP',
+  dor:'Armure: -20% dégâts reçus',lame:'Critique: 20% chance ×2 dégâts',
+  tour:'Priorité anti-aérien',champ:'Inspiration: unités alliées +10% ATK dans rayon 4',
+  larve:'Nuée: +1 ATK par larve alliée proche',rav:'Frénésie: +20% ATK en dessous 50% HP',
+  spec:'Venin: empoisonne les cibles',bris:'Broyage: -25% armure cible',
+  nid:'Ponte: génère une larve toutes les 8s',dev:'Apex: régén 5HP/s',
+  min:'Veines: mines durent 2× plus longtemps',gard:'Forteresse: régén 3HP/s au repos',
+  sent:'Cristal: 15% chance de bloquer les dégâts',bast:'Encaisse: absorbe 30% dégâts pour alliés proches',
+  can:'Portée: +20% portée vs bâtiments',titc:'Invincible: ne peut pas être critique',
+  dron:'Radar: révèle ennemis dans rayon 8',snip:'Pointage: +50% dégâts premier tir',
+  and:'Interface: +15% vitesse de production',mis:'Fragmenté: AoE sur impact',
+  las:'Continu: +5% dégâts par seconde consécutive',titm:'Réacteur: bouclier 200HP à pleine vie'
+};
+
 // ── ABILITY NAMES & HERO PROGRESSION ────────────────────────────────────
 const ABILITY_NAMES={nexus:'Bouclier Énergie',vide:'Drain Vital',cristal:'Soin de Cristal',synth:'Frappe Orbitale'};
 const HERO_XP=[0,120,300,620,1100,1900]; // XP thresholds for levels 1-5
@@ -1056,23 +1072,56 @@ function spawnMines(){
 
 // ── TERRAIN ───────────────────────────────────────────────────────────────
 function spawnTerrain(){
-  let placed=0;
-  let attempts=0;
-  while(placed<25&&attempts<200){
+  // Rocks
+  let placed=0,attempts=0;
+  while(placed<30&&attempts<300){
     attempts++;
-    const x=rr(-MAP/2+8,MAP/2-8);
-    const z=rr(-MAP/2+8,MAP/2-8);
+    const x=rr(-MAP/2+8,MAP/2-8),z=rr(-MAP/2+8,MAP/2-8);
     if(Math.hypot(x,z-65)<18||Math.hypot(x,z+65)<18)continue;
-    const sz=rr(0.6,2.2);
-    const rock=new THREE.Mesh(
-      new THREE.DodecahedronGeometry(sz,0),
-      new THREE.MeshPhongMaterial({color:new THREE.Color().setHSL(0.72,0.3,rr(0.08,0.2)),shininess:5})
-    );
-    rock.position.set(x,sz*0.5,z);
-    rock.rotation.set(rr(0,Math.PI),rr(0,Math.PI),rr(0,Math.PI));
-    rock.castShadow=true;rock.receiveShadow=true;
-    scene.add(rock);
-    placed++;
+    const sz=rr(0.5,2.0);
+    const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(sz,0),
+      new THREE.MeshPhongMaterial({color:new THREE.Color().setHSL(0.72,0.3,rr(0.07,0.18)),shininess:5}));
+    rock.position.set(x,sz*0.5,z);rock.rotation.set(rr(0,Math.PI),rr(0,Math.PI),rr(0,Math.PI));
+    rock.castShadow=true;rock.receiveShadow=true;scene.add(rock);placed++;
+  }
+  // Crystal clusters (mid-map decoration)
+  for(let i=0;i<12;i++){
+    const cx=rr(-40,40),cz=rr(-35,35);
+    if(Math.hypot(cx,cz-65)<22||Math.hypot(cx,cz+65)<22)continue;
+    for(let j=0;j<4;j++){
+      const ox=rr(-1.5,1.5),oz=rr(-1.5,1.5);
+      const h=rr(0.8,2.8);
+      const c=new THREE.Mesh(new THREE.ConeGeometry(rr(0.08,0.22),h,5),
+        new THREE.MeshPhongMaterial({color:0x7c3aed,emissive:0x3b0764,transparent:true,opacity:rr(0.55,0.85),shininess:120}));
+      c.position.set(cx+ox,h/2,cz+oz);c.rotation.y=rr(0,Math.PI*2);scene.add(c);
+    }
+  }
+  // Lava crack / energy lines (flat glowing quads)
+  for(let i=0;i<8;i++){
+    const lx=rr(-55,55),lz=rr(-55,55);
+    if(Math.hypot(lx,lz-65)<20||Math.hypot(lx,lz+65)<20)continue;
+    const len=rr(4,12),ang=rr(0,Math.PI);
+    const crack=new THREE.Mesh(new THREE.PlaneGeometry(len,0.18),
+      new THREE.MeshBasicMaterial({color:0xc026d3,transparent:true,opacity:0.35,side:THREE.DoubleSide}));
+    crack.rotation.x=-Math.PI/2;crack.rotation.z=ang;crack.position.set(lx,0.05,lz);scene.add(crack);
+  }
+  // Ruined pillars (mid-map)
+  for(let i=0;i<10;i++){
+    const px=rr(-60,60),pz=rr(-60,60);
+    if(Math.hypot(px,pz-65)<20||Math.hypot(px,pz+65)<20)continue;
+    const h=rr(1,4);
+    const pillar=new THREE.Mesh(new THREE.CylinderGeometry(rr(0.15,0.4),rr(0.2,0.5),h,6),
+      new THREE.MeshPhongMaterial({color:new THREE.Color().setHSL(0.73,0.25,rr(0.10,0.22)),shininess:8}));
+    pillar.position.set(px,h/2,pz);pillar.rotation.set(rr(-0.1,0.1),rr(0,Math.PI),rr(-0.1,0.1));
+    pillar.castShadow=true;scene.add(pillar);
+  }
+  // Glowing ore deposits on ground
+  for(let i=0;i<15;i++){
+    const ox=rr(-70,70),oz=rr(-70,70);
+    if(Math.hypot(ox,oz-65)<16||Math.hypot(ox,oz+65)<16)continue;
+    const ore=new THREE.Mesh(new THREE.SphereGeometry(rr(0.15,0.4),5,4),
+      new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(rr(0.6,0.85),0.9,0.5),transparent:true,opacity:rr(0.4,0.7)}));
+    ore.position.set(ox,0.1,oz);scene.add(ore);
   }
 }
 
@@ -1098,6 +1147,20 @@ function spawnBase(race,x,z,team){
 
 // ── PRODUCTION BUILDINGS ───────────────────────────────────────────────────
 function buildPBld(typeId){
+  // Universal watchtower
+  if(typeId==='b_watch'){
+    if(G.ess<60){toast('Essence insuffisante!');return;}
+    const existing=G.pblds.filter(b=>b.alive&&b.team===1&&b.typeId==='b_watch').length;
+    if(existing>=4){toast('Maximum 4 tours!');return;}
+    G.ess-=60;
+    const pb=getPBase();
+    const angle=(existing*90+45)*PI/180;
+    const r=14+existing*2;
+    const x=clamp(pb.x+Math.cos(angle)*r,-MAP/2+5,MAP/2-5);
+    const z=clamp(pb.z+Math.sin(angle)*r,-MAP/2+5,MAP/2-5);
+    spawnWatchtower(x,z);
+    SND.build();toast('Tour de Garde construite!');updateBuildUI();return;
+  }
   const race=RACES[G.race];
   const def=race.bldgs.find(b=>b.id===typeId);
   if(!def){toast('Bâtiment inconnu');return;}
@@ -1118,6 +1181,33 @@ function buildPBld(typeId){
   spawnPBld(typeId,x,z,1);
   SND.build();toast(def.name+' construit!');
   updateBuildUI();
+}
+
+function spawnWatchtower(wx,wz){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.65,2.5,8),new THREE.MeshPhongMaterial({color:0x374151,shininess:40}));
+  base.position.y=1.25;g.add(base);
+  const top=new THREE.Mesh(new THREE.ConeGeometry(0.8,1.2,8),new THREE.MeshPhongMaterial({color:0x4b5563,shininess:30}));
+  top.position.y=3.1;g.add(top);
+  const gem=new THREE.Mesh(new THREE.OctahedronGeometry(0.22,0),new THREE.MeshBasicMaterial({color:0x4ade80}));
+  gem.position.y=3.9;g.add(gem);addBob(gem,0.15,2.8);
+  const pl=new THREE.PointLight(0x4ade80,1.0,12);pl.position.y=4;g.add(pl);
+  g.position.set(wx,0,wz);
+  g.traverse(c=>{if(c.isMesh){c.castShadow=true;}});
+  scene.add(g);
+  const b={id:G.nid++,typeId:'b_watch',name:'Tour de Garde',
+    def:{id:'b_watch',name:'Tour de Garde',cost:60,hp:220,sz:1.2,col:0x4ade80,desc:'Défense fixe',rate:2.2},
+    team:1,x:wx,z:wz,hp:220,maxHp:220,mesh:g,alive:true,isPBld:true,queue:[],rally:null,vr:8,light:pl,level:1,upgrading:false,upgradeT:0};
+  // Spawn sentinel unit at tower (stationary, no pop cost)
+  const sent={id:G.nid++,uid:'b_watch_gun',name:'Canon Tour',race:G.race,team:1,
+    x:wx,z:wz,hp:220,maxHp:220,atk:22,rng:6,spd:0,rep:2.2,repT:0,mesh:g,sz:0.8,
+    alive:true,harvester:false,stationary:true,dest:null,target:null,
+    harvT:0,harv:null,poisonT:0,sdb:0,pop:0,kills:0,veteran:false,passiveT:0,
+    isTowerGun:true,tower:b};
+  G.pblds.push(b);
+  G.units.push(sent);
+  b.sentinelUnit=sent;
+  return b;
 }
 
 function spawnPBld(typeId,wx,wz,team){
@@ -1227,8 +1317,13 @@ function spawnUnit(uid,race,wx,wz,team){
     harv:null,
     poisonT:0,
     sdb:eff.sdb||0,
-    pop:ud.pop
+    pop:ud.pop,
+    kills:0,
+    veteran:false,
+    passiveT:0
   };
+  // Titan passive: start with 200 shield when at full HP
+  if(ud.id==='titm'||ud.id==='titc'){u.shield=200;u.shieldT=9999;}
   G.units.push(u);
   G.pop+=ud.pop;
   return u;
@@ -1242,10 +1337,21 @@ function removeUnit(u){
   if(G.pop<0)G.pop=0;
   G.sel=G.sel.filter(id=>id!==u.id);
   if(u.team===2){G_kills++;const kd=document.getElementById('kill-count');if(kd)kd.textContent='⚔ '+G_kills;G_streak++;G_streakT=3;if(G_streak===3)toast('🔥 Triple Frappe!',2000);else if(G_streak===5)toast('🔥 Pentakill!',2000);else if(G_streak===10)toast('🔥 Dominance!',2500);}
+  // Credit kill to attacker (closest player unit in range)
+  if(u.team===2){
+    let nearest=null,nd=8;
+    for(const ally of G.units){if(!ally.alive||ally.team!==1||ally.isHero)continue;const d=dst2(ally.x,ally.z,u.x,u.z);if(d<nd){nd=d;nearest=ally;}}
+    if(nearest&&!nearest.veteran){nearest.kills++;if(nearest.kills>=3){nearest.veteran=true;nearest.atk=Math.floor(nearest.atk*1.25);nearest.maxHp=Math.floor(nearest.maxHp*1.2);nearest.hp=Math.min(nearest.hp+Math.floor(nearest.maxHp*0.2),nearest.maxHp);const star=new THREE.Mesh(new THREE.OctahedronGeometry(0.18,0),new THREE.MeshBasicMaterial({color:0xffd700}));star.position.set(0,1.2,0);nearest.mesh.add(star);nearest.vetStar=star;addBob(star,0.15,3.5);toast('⭐ '+nearest.name+' est devenu Vétéran!',2500);}}
+  }
   spawnBurst(u.x,u.z,u.team===1?0x3b82f6:0xef4444,u.isHero?18:7,u.isHero?4:2);
   spawnRing(u.x,u.z,u.team===2?0xef4444:0x4ade80);
   if(u.isHero&&u.team===2){G_enemyHero=null;toast('⚔ Héros ennemi vaincu!',2500);SND.win();}
   if(u.isHero&&u.team===1){G_hero=null;toast('💀 Votre héros est tombé!',3000);}
+  // Tower gun: destroy the tower building too
+  if(u.isTowerGun&&u.tower&&u.tower.alive){
+    u.tower.alive=false;scene.remove(u.tower.mesh);if(u.tower.light)scene.remove(u.tower.light);
+    G.pblds=G.pblds.filter(b=>b!==u.tower);toast('Tour détruite!');
+  }
 }
 
 // ── AI SPAWN ───────────────────────────────────────────────────────────────
@@ -1332,6 +1438,10 @@ function dealDmg(attacker,target,amount){
     target.poisonT=(target.poisonT||0)+4;
   }
   if(att.sdb>0)amount+=rr(0,att.sdb)|0;
+  // Lame passive: 20% crit ×2
+  if(attacker&&attacker.uid==='lame'&&Math.random()<0.20){amount*=2;addFloat(attacker.x,attacker.z,'CRITIQUE!','#f59e0b');}
+  // Dor passive: -20% incoming damage
+  if(target.uid==='dor')amount=Math.floor(amount*0.80);
   if(target.shield&&target.shield>0){
     const absorbed=Math.min(target.shield,amount);
     target.shield-=absorbed;amount-=absorbed;
@@ -1462,6 +1572,13 @@ function updateUnits(dt){
     }
     const eff=u.team===1?G.tb:G.eb;
     if(eff.regen>0&&u.hp<u.maxHp){u.hp=Math.min(u.maxHp,u.hp+eff.regen*dt);}
+    // Dev passive: apex regeneration
+    if(u.uid==='dev'&&u.hp<u.maxHp){u.hp=Math.min(u.maxHp,u.hp+5*dt);}
+    // Gard passive: regen when not attacking
+    if(u.uid==='gard'&&!u.target&&u.hp<u.maxHp){u.hp=Math.min(u.maxHp,u.hp+3*dt);}
+    // Kira passive: sprint below 40% HP
+    const baseSpdKira=u.uid==='kira'?u.spd/(u._sprint?1.3:1):u.spd;
+    if(u.uid==='kira'){if(u.hp/u.maxHp<0.4&&!u._sprint){u._sprint=true;u.spd*=1.3;}else if(u.hp/u.maxHp>=0.4&&u._sprint){u._sprint=false;u.spd/=1.3;}}
     if(u.shieldT>0){u.shieldT-=dt;if(u.shieldT<=0){u.shield=0;u.shieldT=0;}}
     u.repT=Math.max(0,u.repT-dt);
     if(u.harvester&&u.team===1){
@@ -1522,6 +1639,14 @@ function updateUnits(dt){
     if(!u.stationary){u.mesh.position.set(u.x,0,u.z);}
   }
   for(const u of G.units){if(!u.alive)continue;if(u.hp<=0)removeUnit(u);}
+  // Champion passive aura: +10% ATK for nearby allies (applied per-tick, not stacking)
+  for(const u of G.units){
+    if(!u.alive||u.uid!=='champ'||u.team!==1)continue;
+    for(const ally of G.units){
+      if(!ally.alive||ally.team!==1||ally===u||ally.isHero)continue;
+      if(dst2(u.x,u.z,ally.x,ally.z)<4){ally._champBuff=true;}
+    }
+  }
 }
 
 function separateUnits(){
@@ -1780,14 +1905,16 @@ function updateSelUI(){
   const shieldBar=u.shield&&u.shield>0?`<div style="font-size:9px;color:#818cf8;margin-top:2px">🛡 Bouclier: ${u.shield}</div>`:'';
   const poisonBar=u.poisonT&&u.poisonT>0?`<div style="font-size:9px;color:#4ade80;margin-top:2px">☠ Empoisonné: ${u.poisonT.toFixed(1)}s</div>`:'';
   const heroTag=u.isHero?`<div style="font-size:8px;color:#ffd700;font-family:'Share Tech Mono';margin-bottom:3px">⭐ HÉROS — Niv.${u.level} · XP ${u.xp}</div>`:'';
+  const vetTag=u.veteran?`<div style="font-size:8px;color:#ffd700;margin-bottom:2px">★ VÉTÉRAN (+25% ATK/HP)</div>`:(!u.isHero&&u.kills>0?`<div style="font-size:8px;color:#9ca3af;margin-bottom:2px">Élim. ${u.kills}/3 → Vétéran</div>`:'');
+  const passiveTag=UNIT_PASSIVE[u.uid]?`<div style="font-size:8px;color:#4b5563;margin-top:2px;font-style:italic">Passif: ${UNIT_PASSIVE[u.uid]}</div>`:'';
   ifo.innerHTML=`
-    ${heroTag}
+    ${heroTag}${vetTag}
     <div style="font-size:12px;font-weight:700;color:#c4b5fd;margin-bottom:3px">${u.name}${G.sel.length>1?' ×'+G.sel.length:''}</div>
     <div style="background:#1a0f3a;height:5px;border-radius:3px;overflow:hidden;margin-bottom:3px">
       <div style="width:${hp}%;height:100%;background:${u.shield&&u.shield>0?'linear-gradient(90deg,#818cf8,#c4b5fd)':'linear-gradient(90deg,#ef4444,#fde047,#4ade80)'};border-radius:3px"></div>
     </div>
     <div style="font-size:10px;color:#6b5fa0">HP ${u.hp|0}/${u.maxHp} · ATK ${u.atk} · RNG ${u.rng.toFixed(1)}</div>
-    ${shieldBar}${poisonBar}
+    ${shieldBar}${poisonBar}${passiveTag}
     ${G.sel.length>1?`<div style="font-size:10px;color:#3d2f6e;margin-top:3px">Groupe: ${G.sel.length} unités</div>`:''}
   `;
 }
@@ -1862,6 +1989,15 @@ function updateBuildUI(){
       <div class="pbtn-sub">${bd.desc}</div>
     </button>`;
   }
+  // Universal defense towers (max 4)
+  const towerCount=G.pblds.filter(b=>b.alive&&b.team===1&&b.typeId==='b_watch').length;
+  const towerMaxed=towerCount>=4;
+  const towerAfford=G.ess>=60;
+  bHtml+=`<button class="pbtn${towerMaxed||!towerAfford?' dis':''}" onclick="buildPBld('b_watch')" ${towerMaxed||!towerAfford?'disabled':''}>
+    <div class="pbtn-name">🗼 Tour de Garde${towerMaxed?' <span style="color:#4ade80">(4/4)</span>':' <span style="color:#374151">('+towerCount+'/4)</span>'}</div>
+    <div class="pbtn-cost">✦ 60 — ATK 22 · Portée 6</div>
+    <div class="pbtn-sub">Défense fixe universelle</div>
+  </button>`;
   let uHtml='';
   for(const ud of race.units){
     const canAfford=G.ess>=ud.cost;
