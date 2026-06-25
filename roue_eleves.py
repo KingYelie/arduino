@@ -118,8 +118,9 @@ class WheelApp:
         if m == "demi_groupe_2": return list(g2)
         return list(g1) + list(g2)
 
-    def called_set(self):
-        return {e["student"] for e in self.history}
+    def called_set(self, mode=None):
+        m = mode if mode is not None else self.mode.get()
+        return {e["student"] for e in self.history if e.get("mode") == m}
 
     def mode_name(self, m=None):
         return {"classe_entiere": "Classe entière",
@@ -383,9 +384,9 @@ class WheelApp:
             "demi_groupe_2":  len(g2),
         }
         called_counts = {
-            "classe_entiere": sum(1 for s in g1+g2 if s in called),
-            "demi_groupe_1":  sum(1 for s in g1 if s in called),
-            "demi_groupe_2":  sum(1 for s in g2 if s in called),
+            "classe_entiere": sum(1 for s in g1+g2 if s in self.called_set("classe_entiere")),
+            "demi_groupe_1":  sum(1 for s in g1 if s in self.called_set("demi_groupe_1")),
+            "demi_groupe_2":  sum(1 for s in g2 if s in self.called_set("demi_groupe_2")),
         }
         labels = {
             "classe_entiere": "Classe entière",
@@ -763,12 +764,7 @@ class WheelApp:
                 "Réinitialisation",
                 f"Effacer l'historique pour : {self.mode_name()} ?"):
             return
-        if m == "classe_entiere":
-            self.history = []
-        else:
-            group = set(self.students.get(m, []))
-            self.history = [e for e in self.history
-                            if e["student"] not in group]
+        self.history = [e for e in self.history if e.get("mode") != m]
         save_history(self.history)
         self._clear_result()
         self._refresh()
@@ -867,7 +863,7 @@ class WheelApp:
 
             def _refresh_lb(lb=lb, gk=gkey, cl=count_lbl):
                 lb.delete(0, tk.END)
-                c = self.called_set()
+                c = self.called_set(gk)
                 for s in self.students.get(gk, []):
                     lb.insert(tk.END, ("★  " if s in c else "   ") + s)
                     if s in c:
